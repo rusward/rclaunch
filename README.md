@@ -4,9 +4,10 @@
 Microsoft, изолированные инстансы как в PrismLauncher, мульти-аккаунт, скины и
 плащи, моды из Modrinth. Минималистичный чёрно-белый интерфейс с синим акцентом.
 
-> Статус: рабочий фундамент. Уже есть инстансы (создание/удаление, изоляция),
-> вход Microsoft и мульти-аккаунт, превью скина/плаща, поиск и установка модов
-> из Modrinth, манифест версий Mojang. Запуск игры — следующий этап.
+> Статус: лаунчер уже запускает игру. Есть инстансы (создание/удаление, изоляция),
+> вход Microsoft и мульти-аккаунт, превью скина/плаща, Modrinth, а также полный
+> пайплайн запуска Vanilla/Fabric/Quilt: version JSON, libraries, assets, JRE,
+> classpath, процесс Java и консоль логов. Forge/NeoForge — следующий этап.
 
 ## Стек
 
@@ -14,7 +15,8 @@ Microsoft, изолированные инстансы как в PrismLauncher, 
 - **Оболочка:** Tauri 2.
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS 4.
 - **Данные:** TanStack Query.
-- **Источники:** piston-meta.mojang.com, api.modrinth.com.
+- **Источники:** piston-meta.mojang.com, resources.minecraft.net, api.modrinth.com,
+  meta.fabricmc.net, meta.quiltmc.org, api.adoptium.net.
 
 Подробности и принятые решения — в [STACK.md](./STACK.md).
 
@@ -27,6 +29,9 @@ Microsoft, изолированные инстансы как в PrismLauncher, 
   - **Debian/Ubuntu:** `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev`.
   - **Windows:** Visual Studio Build Tools (C++) + WebView2 (обычно уже есть).
   - **macOS:** Xcode Command Line Tools.
+
+Java: используется совместимая системная Java, иначе лаунчер скачивает Temurin JRE.
+Переопределить путь можно через `RCLAUNCH_JAVA=/path/to/java`.
 
 ## Запуск
 
@@ -76,14 +81,14 @@ SELinux его можно убрать. Для пакетов замените `
 rclaunch/
 ├─ src/                      # React UI
 │  ├─ screens/               # Instances, Mods, Account, Skins, Settings
-│  ├─ components/            # Rail, IconButton, CreateInstanceDialog
-│  ├─ hooks/                 # instances, versions, Modrinth
+│  ├─ components/            # Rail, IconButton, CreateInstanceDialog, LaunchConsole
+│  ├─ hooks/                 # instances, versions, Modrinth, auth, launch
 │  ├─ lib/                   # IPC-обёртки, форматирование
 │  ├─ bindings.ts            # типы контракта UI ↔ Rust
 │  ├─ App.tsx
 │  └─ styles.css             # чёрно-белая тема
 ├─ src-tauri/                # тонкий слой Tauri: команды и состояние
-│  ├─ src/commands.rs        # версии, инстансы, Modrinth
+│  ├─ src/commands.rs        # версии, инстансы, Modrinth, auth, launch
 │  ├─ src/lib.rs             # builder, плагины, состояние
 │  ├─ capabilities/          # минимальные разрешения
 │  └─ tauri.conf.json
@@ -93,6 +98,11 @@ rclaunch/
 │     ├─ instances.rs        # инстансы, instances.json
 │     ├─ modrinth.rs         # поиск и установка модов
 │     ├─ auth.rs             # Microsoft, Xbox, Minecraft, аккаунты
+│     ├─ version.rs          # version JSON, rules, Maven, merge
+│     ├─ download.rs         # параллельные загрузки + SHA-1
+│     ├─ java.rs             # системная Java / Temurin JRE
+│     ├─ launch.rs           # classpath, аргументы, natives, spawn
+│     ├─ prepare.rs          # полный пайплайн подготовки инстанса
 │     ├─ paths.rs            # каталоги по ОС
 │     └─ error.rs
 ├─ contrib/Containerfile     # сборка в контейнере
@@ -112,16 +122,20 @@ rclaunch/
 - [x] Превью скина (2D-canvas) и плаща из профиля.
 - [x] Загрузка манифеста Mojang и выбор версии.
 - [x] Modrinth: поиск под версию/лоадер и установка в `mods/` с SHA-512.
+- [x] Запуск Vanilla/Fabric/Quilt: version JSON, client jar, libraries, assets,
+      natives, classpath, аргументы и процесс Java.
+- [x] Maven-резолвер для Fabric/Quilt-библиотек и дедупликация версий.
+- [x] JRE: совместимая системная Java или Temurin с Adoptium.
+- [x] Живая консоль запуска: стадии, прогресс загрузки, stdout/stderr игры.
 - [x] Иконки и тема из логотипа, MIT-лицензия, CI.
 
 ## Дальше
 
-1. Свой Azure client_id → device code flow (публичный останется fallback).
+1. Forge/NeoForge: installer/install profile и запуск.
 2. Загрузка скина и выбор плаща через Minecraft Services.
-3. Скачивание version JSON, client jar, libraries и ассетов с hash-проверкой.
-4. JRE: Mojang manifest + Adoptium fallback.
-5. Fabric/Quilt-профили и запуск игры с консолью логов.
-6. Зависимости модов, ресурспаки и шейдеры Modrinth.
+3. Свой Azure client_id → device code flow (публичный останется fallback).
+4. Зависимости модов, ресурспаки и шейдеры Modrinth.
+5. Настройки RAM/разрешения, i18n, несколько окон логов.
 
 ## Лицензия
 

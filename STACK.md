@@ -185,16 +185,16 @@ TypeScript-типы событий и команд генерируются/по
 
 ### 4.3 Java
 
-Стратегия: **сначала официальный манифест JRE от Mojang**, затем fallback на
-Adoptium/Temurin.
+Текущая стратегия: **совместимая системная Java → Temurin с Adoptium**.
 
-- Mojang: `https://launchermeta.mojang.com/v1/products/java-runtime/...` — компоненты
-  `jre-legacy`, `java-runtime-alpha/beta/gamma/delta` под конкретную платформу.
-- Fallback: `https://api.adoptium.net/v3/binary/latest/{feature}/ga/{os}/{arch}/jre/hotspot/normal/eclipse`
-  (например, Java 8/17/21 в зависимости от версии игры).
-- JRE ставим в `<data>/runtimes/<component>/<os>-<arch>/`.
-- Если найдена системная Java подходящей мажорной версии — можно использовать её
-  (настройка «авто / системная / встроенная»).
+- `RCLAUNCH_JAVA` — ручное переопределение пути.
+- Встроенная Java: `<data>/runtimes/temurin-<major>/bin/java`.
+- Системная Java: принимается, если мажор совпадает; для требуемых 17+ допускается
+  более новая (например, Java 25 для Minecraft 1.21).
+- Иначе скачивается JRE:
+  `https://api.adoptium.net/v3/binary/latest/{feature}/ga/{os}/{arch}/jre/hotspot/normal/eclipse`.
+- Архив распаковывается в `runtimes/temurin-<major>` (tar.gz / zip).
+- Манифест JRE Mojang можно добавить позже как альтернативный источник.
 
 ### 4.4 Авторизация Microsoft
 
@@ -338,14 +338,17 @@ rclaunch/
 
 ### 6.2 Установка и запуск инстанса
 
-1. Проверить version JSON, client jar, libraries и ассеты (с учётом rules/OS).
-2. Дозагрузить недостающее; хэши проверяются по манифесту.
-3. Подобрать/установить JRE нужной мажорной версии.
-4. Для модлоадера — подтянуть его библиотеки и объединить профиль с базовой версией.
-5. Собрать classpath и аргументы JVM/игры для **game-dir инстанса**.
-6. Запустить `java` как дочерний процесс, стримить stdout/stderr в консоль.
-7. Отслеживать exit code; при необходимости показать диагностику (OOM, неверная Java).
-8. Обновить `lastPlayedAt` инстанса.
+1. Скачать version JSON и client jar, проверить SHA-1.
+2. Для Fabric/Quilt подтянуть meta-профиль, объединить с базовой версией,
+   разрешить Maven-библиотеки (`name` + `url`) и дедуплицировать по
+   `group:artifact[:classifier]` — версия лоадера побеждает.
+3. Скачать libraries с учётом `rules` (ОС/арх), natives-классификаторы и Maven fallback.
+4. Скачать asset index и объекты в `assets/objects` (SHA-1 каждого файла).
+5. Подобрать системную Java или установить Temurin JRE с Adoptium.
+6. Распаковать natives в `instances/<id>/natives`.
+7. Собрать classpath и аргументы JVM/игры для **game-dir инстанса**.
+8. Запустить `java` как дочерний процесс, стримить stdout/stderr в консоль.
+9. Отследить exit code и обновить `lastPlayedAt`.
 
 Команда запуска (упрощённо):
 
@@ -359,8 +362,8 @@ java -Xmx<ram>M -Xms<ram>M \
   --assetIndex <index> --userType msa --versionType <release>
 ```
 
-Прогресс передаётся событиями: `download:progress`, `install:stage`, `game:log`,
-`game:exited`.
+События UI: `launch:stage`, `launch:progress`, `launch:log`, `launch:started`,
+`launch:exited`, `launch:error`.
 
 ### 6.3 Авторизация и мульти-аккаунт
 
@@ -453,10 +456,16 @@ java -Xmx<ram>M -Xms<ram>M \
 - **ADR-001** — Tauri 2 вместо Electron: размер и потребление ресурсов важнее
   обилия готовых примеров.
 - **ADR-002** — ядро вынесено в отдельный крейт `core`, Tauri — тонкий адаптер.
-- **ADR-003** — Microsoft device code flow вместо локального redirect-сервера:
-  проще и безопаснее, работает на всех ОС.
+- **ADR-003** — Microsoft OAuth: сейчас live.com authorization code во встроенном
+  окне Tauri; device code — после своего Azure-приложения.
 - **ADR-004** — в первую очередь Vanilla + Fabric + Quilt; Forge/NeoForge уже есть
   в модели инстансов и UI, установка — следующий этап.
+- **ADR-005** — Java: совместимая системная или Temurin с Adoptium; манифест JRE
+  Mojang можно добавить позже.
+- **ADR-006** — установку, запуск и auth-цепочку пишем сами: готовые крейты не
+  дают нужного контроля над прогрессом, кэшем и обработкой ошибок.
+- **ADR-007** — проект открытый, лицензия MIT; тема оформления строится на палитре
+  логотипа (чёрный фон + синие акценты), без внешних CDN и шрифтов.
 - **ADR-008** — только легальные Microsoft-аккаунты; офлайн-режим не поддерживаем.
 - **ADR-009** — каждый инстанс изолирован: свой `game/`, version JSON и лоадер;
   libraries/assets/runtimes — общий read-only кэш.
@@ -467,11 +476,9 @@ java -Xmx<ram>M -Xms<ram>M \
 - **ADR-012** — пока нет своего Azure-приложения, используем публичный client_id
   и live.com authorization code; после регистрации и одобрения Mojang переходим
   на device code без изменения остального кода.
-- **ADR-005** — JRE из манифеста Mojang с fallback на Adoptium.
-- **ADR-006** — install/launch пишем сами, auth через `minecraft-msa-auth` + `oauth2`:
-  готовых крейтов нужной зрелости нет, а установка/запуск — ядро UX лаунчера.
-- **ADR-007** — проект открытый, лицензия MIT; тема оформления строится на палитре
-  логотипа (чёрный фон + синие акценты), без внешних CDN и шрифтов.
+- **ADR-013** — launch pipeline: version JSON + client jar, libraries (rules,
+  natives, Maven fallback), assets с SHA-1, JRE, дедупликация библиотек по
+  `group:artifact[:classifier]`, natives в каталог инстанса, spawn Java и стрим логов.
 
 ---
 

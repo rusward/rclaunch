@@ -25,6 +25,8 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+export const isDesktop = isTauri();
+
 async function fetchManifestInBrowser(): Promise<VersionManifest> {
   const response = await fetch(MANIFEST_URL);
   if (!response.ok) {
@@ -214,4 +216,9 @@ export const ipc = {
 
   authLogout: (id: string): Promise<void> =>
     isTauri() ? invoke<void>("auth_logout", { id }) : Promise.resolve(),
+
+  launchInstance: (instanceId: string): Promise<void> =>
+    isTauri()
+      ? invoke<void>("launch_instance", { instanceId })
+      : Promise.reject(new Error("Запуск игры доступен только в приложении")),
 };

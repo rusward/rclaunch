@@ -293,6 +293,16 @@ impl AuthService {
             .cloned()
     }
 
+    /// Возвращает живую сессию или обновляет её по refresh-токену.
+    pub async fn ensure_session(&self, id: &str) -> Result<Session> {
+        if let Some(session) = self.session(id) {
+            if session.expires_at > now_millis() + 60_000 {
+                return Ok(session);
+            }
+        }
+        self.refresh_account(id).await
+    }
+
     async fn exchange_code(&self, code: &str) -> Result<MsaToken> {
         let response = self
             .http

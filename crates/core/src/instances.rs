@@ -129,6 +129,26 @@ impl InstanceService {
             .cloned()
     }
 
+    pub fn set_loader_version(&self, id: &str, version: &str) -> Result<()> {
+        let mut instances = self.lock();
+        let instance = instances
+            .iter_mut()
+            .find(|instance| instance.id == id)
+            .ok_or_else(|| CoreError::Message("instance not found".into()))?;
+        instance.loader_version = Some(version.to_string());
+        self.save(&instances)
+    }
+
+    pub fn mark_played(&self, id: &str) -> Result<()> {
+        let mut instances = self.lock();
+        let instance = instances
+            .iter_mut()
+            .find(|instance| instance.id == id)
+            .ok_or_else(|| CoreError::Message("instance not found".into()))?;
+        instance.last_played_at = Some(now_millis());
+        self.save(&instances)
+    }
+
     pub fn create(&self, request: CreateInstance) -> Result<Instance> {
         let name = validate_name(&request.name)?;
         let minecraft_version = request.minecraft_version.trim().to_string();

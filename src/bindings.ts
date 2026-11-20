@@ -90,3 +90,8 @@ export interface AccountsView {
   accounts: Account[];
   activeId: string | null;
 }
+
+export interface LaunchProgress {
+  completed: number;
+  total: number;
+}

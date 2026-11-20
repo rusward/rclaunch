@@ -9,6 +9,7 @@ import {
   Hammer,
   Layers,
   Loader2,
+  LogIn,
   Package,
   Play,
   Plus,
@@ -19,6 +20,10 @@ import {
 } from "lucide-react";
 
 import type { Instance, Loader } from "../bindings";
+import type { Screen } from "../components/Rail";
+import { LaunchConsole } from "../components/LaunchConsole";
+import { useAccounts } from "../hooks/useAccounts";
+import { useLaunch } from "../hooks/useLaunch";
 import { formatRelative, loaderLabel } from "../lib/format";
 import { CreateInstanceDialog } from "../components/CreateInstanceDialog";
 import { IconButton } from "../components/IconButton";
@@ -39,6 +44,7 @@ interface InstancesScreenProps {
   onSelect: (id: string) => void;
   onCreated: (instance: Instance) => void;
   onDelete: (id: string) => void;
+  onNavigate: (screen: Screen) => void;
 }
 
 export function InstancesScreen({
@@ -49,9 +55,16 @@ export function InstancesScreen({
   onSelect,
   onCreated,
   onDelete,
+  onNavigate,
 }: InstancesScreenProps) {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const { data: accounts } = useAccounts();
+  const launch = useLaunch();
+
+  const activeAccount =
+    accounts?.accounts.find((account) => account.id === accounts.activeId) ??
+    null;
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -129,8 +142,16 @@ export function InstancesScreen({
 
         <InstanceDetail
           instance={selected}
+          canPlay={Boolean(activeAccount)}
+          isLaunching={launch.isRunning}
+          onPlay={() => {
+            if (selected) {
+              launch.start(selected.id, selected.name);
+            }
+          }}
           onCreate={() => setCreateOpen(true)}
           onDelete={onDelete}
+          onNavigate={onNavigate}
         />
       </div>
 
@@ -141,6 +162,14 @@ export function InstancesScreen({
             setCreateOpen(false);
             onCreated(instance);
           }}
+        />
+      )}
+
+      {launch.open && (
+        <LaunchConsole
+          state={launch}
+          isRunning={launch.isRunning}
+          onClose={launch.close}
         />
       )}
     </div>
@@ -188,12 +217,20 @@ function InstanceRow({
 
 function InstanceDetail({
   instance,
+  canPlay,
+  isLaunching,
+  onPlay,
   onCreate,
   onDelete,
+  onNavigate,
 }: {
   instance: Instance | null;
+  canPlay: boolean;
+  isLaunching: boolean;
+  onPlay: () => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onNavigate: (screen: Screen) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
 
@@ -253,13 +290,39 @@ function InstanceDetail({
       <div className="mt-6 flex items-center gap-2">
         <button
           type="button"
-          disabled
-          title="Запуск — следующий шаг"
-          className="flex h-9 cursor-not-allowed items-center gap-2 rounded-md bg-accent-600 px-4 text-[12px] font-medium text-white opacity-60"
+          disabled={!canPlay || isLaunching}
+          title={
+            !canPlay
+              ? "Сначала войди через Microsoft"
+              : isLaunching
+                ? "Игра уже запускается"
+                : "Запустить игру"
+          }
+          onClick={onPlay}
+          className={clsx(
+            "flex h-9 items-center gap-2 rounded-md px-4 text-[12px] font-medium text-white transition-colors duration-100",
+            canPlay && !isLaunching
+              ? "bg-accent-600 hover:bg-accent-500"
+              : "cursor-not-allowed bg-accent-600 opacity-60",
+          )}
         >
-          <Play size={14} fill="currentColor" />
-          Играть
+          {isLaunching ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Play size={14} fill="currentColor" />
+          )}
+          {isLaunching ? "Запуск" : "Играть"}
         </button>
+        {!canPlay && (
+          <button
+            type="button"
+            onClick={() => onNavigate("account")}
+            className="flex h-9 items-center gap-1.5 rounded-md px-3 text-[12px] text-muted transition-colors duration-100 hover:bg-white/[0.05] hover:text-white"
+          >
+            <LogIn size={14} />
+            Войти
+          </button>
+        )}
         <IconButton icon={FolderOpen} label="Открыть папку" disabled />
         <IconButton icon={Settings2} label="Настройки инстанса" disabled />
 

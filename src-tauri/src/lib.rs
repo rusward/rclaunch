@@ -40,6 +40,7 @@ pub fn run() {
             commands::auth_set_active,
             commands::auth_logout,
             commands::auth_login,
+            commands::launch_instance,
         ])
         .run(tauri::generate_context!())
         .expect("error while running rclaunch");

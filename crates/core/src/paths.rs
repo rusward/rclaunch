@@ -26,11 +26,15 @@ impl Paths {
     /// Создаёт все каталоги, если их ещё нет.
     pub fn ensure(&self) -> Result<()> {
         for dir in [
-            &self.config,
-            &self.data,
-            &self.cache,
-            &self.game_dir(),
-            &self.instances_dir(),
+            self.config.clone(),
+            self.data.clone(),
+            self.cache.clone(),
+            self.instances_dir(),
+            self.versions_dir(),
+            self.libraries_dir(),
+            self.assets_dir(),
+            self.runtimes_dir(),
+            self.logs_dir(),
         ] {
             std::fs::create_dir_all(dir)?;
         }
@@ -49,21 +53,17 @@ impl Paths {
         &self.cache
     }
 
-    /// Корень игровых файлов в раскладке `.minecraft`.
-    pub fn game_dir(&self) -> PathBuf {
-        self.data.join("game")
-    }
-
+    /// Общий кэш version JSON и client jar.
     pub fn versions_dir(&self) -> PathBuf {
-        self.game_dir().join("versions")
+        self.data.join("versions")
     }
 
     pub fn libraries_dir(&self) -> PathBuf {
-        self.game_dir().join("libraries")
+        self.data.join("libraries")
     }
 
     pub fn assets_dir(&self) -> PathBuf {
-        self.game_dir().join("assets")
+        self.data.join("assets")
     }
 
     pub fn runtimes_dir(&self) -> PathBuf {
@@ -90,6 +90,16 @@ impl Paths {
 
     pub fn instance_mods_dir(&self, id: &str) -> PathBuf {
         self.instance_game_dir(id).join("mods")
+    }
+
+    /// Собранные natives для инстанса.
+    pub fn instance_natives_dir(&self, id: &str) -> PathBuf {
+        self.instance_dir(id).join("natives")
+    }
+
+    /// Version JSON / loader-профиль конкретного инстанса.
+    pub fn instance_version_dir(&self, id: &str) -> PathBuf {
+        self.instance_dir(id).join("version")
     }
 
     pub fn instances_file(&self) -> PathBuf {

@@ -1,13 +1,14 @@
 use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Read};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rclaunch_core::{
-    Account, AccountsView, AuthService, Core, CreateInstance, InstalledMod, Instance,
-    InstanceService, ModSearchResult, VersionManifest,
+    Account, AccountsView, AuthService, Core, CreateInstance, DownloadProgress, InstalledMod,
+    Instance, InstanceService, LaunchReporter, ModSearchResult, VersionManifest,
 };
 use serde::Serialize;
-use tauri::{AppHandle, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
@@ -211,4 +212,103 @@ pub async fn auth_login(app: AppHandle, state: State<'_, AppState>) -> Result<Ac
         log::error!("login failed: {error}");
         error.to_string()
     })
+}
+
+struct EventReporter {
+    app: AppHandle,
+}
+
+impl LaunchReporter for EventReporter {
+    fn stage(&self, stage: &str) {
+        let _ = self.app.emit("launch:stage", stage.to_string());
+    }
+
+    fn download(&self, progress: DownloadProgress) {
+        if progress.total == 0
+            || progress.completed == progress.total
+            || progress.completed.is_multiple_of(8)
+        {
+            let _ = self.app.emit("launch:progress", progress);
+        }
+    }
+}
+
+/// Готовит файлы инстанса и запускает Java. Команда завершается при выходе игры.
+#[tauri::command]
+pub async fn launch_instance(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<(), String> {
+    let instance = state
+        .instances
+        .get(&instance_id)
+        .ok_or_else(|| "instance not found".to_string())?;
+
+    let accounts = state.auth.accounts_view();
+    let account_id = accounts
+        .active_id
+        .ok_or_else(|| "сначала войди через Microsoft".to_string())?;
+    let session = state
+        .auth
+        .ensure_session(&account_id)
+        .await
+        .map_err(|error| {
+            log::error!("session refresh failed: {error}");
+            error.to_string()
+        })?;
+
+    let manifest = state.core.version_manifest().await.map_err(|error| {
+        log::error!("failed to load version manifest: {error}");
+        error.to_string()
+    })?;
+
+    let reporter = EventReporter { app: app.clone() };
+    let prepared = rclaunch_core::prepare::prepare_and_launch(
+        state.core.paths(),
+        &manifest,
+        &instance,
+        &session.profile,
+        &session.access_token,
+        &reporter,
+    )
+    .await
+    .map_err(|error| {
+        log::error!("launch failed: {error}");
+        let _ = app.emit("launch:error", error.to_string());
+        error.to_string()
+    })?;
+
+    if let Some(loader_version) = &prepared.loader_version {
+        let _ = state
+            .instances
+            .set_loader_version(&instance.id, loader_version);
+    }
+    let _ = state.instances.mark_played(&instance.id);
+    let _ = app.emit("launch:started", instance.id.clone());
+
+    let mut child = prepared.child;
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    spawn_log_reader(app.clone(), stdout);
+    spawn_log_reader(app.clone(), stderr);
+
+    let status = tauri::async_runtime::spawn_blocking(move || child.wait())
+        .await
+        .map_err(|error| format!("failed to wait for Java: {error}"))?
+        .map_err(|error| format!("failed to wait for Java: {error}"))?;
+
+    let _ = app.emit("launch:exited", status.code());
+    Ok(())
+}
+
+fn spawn_log_reader<R: Read + Send + 'static>(app: AppHandle, reader: Option<R>) {
+    let Some(reader) = reader else {
+        return;
+    };
+    std::thread::spawn(move || {
+        for line in BufReader::new(reader).lines().map_while(Result::ok) {
+            let _ = app.emit("launch:log", line);
+        }
+    });
 }

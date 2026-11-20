@@ -46,6 +46,7 @@ export default function App() {
           onSelect={setSelectedId}
           onCreated={handleCreated}
           onDelete={handleDelete}
+          onNavigate={setScreen}
         />
       )}
 

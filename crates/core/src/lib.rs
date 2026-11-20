@@ -4,20 +4,27 @@
 //! другого фронтенда. Tauri-слой в `src-tauri` — тонкий адаптер над `Core`.
 
 pub mod auth;
+pub mod download;
 pub mod error;
 pub mod instances;
+pub mod java;
+pub mod launch;
 pub mod modrinth;
 pub mod mojang;
 pub mod paths;
+pub mod prepare;
+pub mod version;
 
 use std::path::Path;
 
 pub use auth::{Account, AccountProfile, AccountsView, AuthService, Cape, Session, Skin};
+pub use download::DownloadProgress;
 pub use error::{CoreError, Result};
 pub use instances::{CreateInstance, Instance, InstanceService, Loader};
 pub use modrinth::{InstalledMod, ModSearchResult, ModrinthClient};
 pub use mojang::{LatestVersions, MojangClient, VersionEntry, VersionManifest, VersionType};
 pub use paths::Paths;
+pub use prepare::{LaunchReporter, PreparedLaunch};
 
 /// Точка входа в ядро: держит пути и клиентов внешних API.
 #[derive(Debug, Clone)]
