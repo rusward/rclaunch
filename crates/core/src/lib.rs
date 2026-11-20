@@ -4,10 +4,16 @@
 //! другого фронтенда. Tauri-слой в `src-tauri` — тонкий адаптер над `Core`.
 
 pub mod error;
+pub mod instances;
+pub mod modrinth;
 pub mod mojang;
 pub mod paths;
 
+use std::path::Path;
+
 pub use error::{CoreError, Result};
+pub use instances::{CreateInstance, Instance, InstanceService, Loader};
+pub use modrinth::{InstalledMod, ModSearchResult, ModrinthClient};
 pub use mojang::{LatestVersions, MojangClient, VersionEntry, VersionManifest, VersionType};
 pub use paths::Paths;
 
@@ -16,6 +22,7 @@ pub use paths::Paths;
 pub struct Core {
     paths: Paths,
     mojang: MojangClient,
+    modrinth: ModrinthClient,
 }
 
 impl Core {
@@ -26,6 +33,7 @@ impl Core {
         let core = Self {
             paths,
             mojang: MojangClient::new()?,
+            modrinth: ModrinthClient::new()?,
         };
         log::info!("core initialized at {}", core.paths.data().display());
         Ok(core)
@@ -39,8 +47,35 @@ impl Core {
         &self.mojang
     }
 
+    pub fn modrinth(&self) -> &ModrinthClient {
+        &self.modrinth
+    }
+
     /// Список версий Minecraft с официального манифеста Mojang.
     pub async fn version_manifest(&self) -> Result<VersionManifest> {
         self.mojang.fetch_manifest().await
+    }
+
+    pub async fn search_mods(
+        &self,
+        query: &str,
+        game_version: Option<&str>,
+        loader: Option<&str>,
+    ) -> Result<Vec<ModSearchResult>> {
+        self.modrinth
+            .search(query, game_version, loader, None)
+            .await
+    }
+
+    pub async fn install_mod(
+        &self,
+        project_id: &str,
+        game_version: &str,
+        loader: &str,
+        mods_dir: &Path,
+    ) -> Result<InstalledMod> {
+        self.modrinth
+            .install(project_id, game_version, loader, mods_dir)
+            .await
     }
 }

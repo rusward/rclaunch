@@ -1,18 +1,20 @@
 # rclaunch
 
-Лёгкий кроссплатформенный лаунчер Minecraft с официальной авторизацией,
-поддержкой Fabric/Quilt и тёмной чёрно-синей темой.
+Лёгкий кроссплатформенный лаунчер Minecraft: только официальные аккаунты
+Microsoft, изолированные инстансы как в PrismLauncher, мульти-аккаунт, скины и
+плащи, моды из Modrinth. Минималистичный чёрно-белый интерфейс с синим акцентом.
 
-> Статус: ранний скелет. Уже работает загрузка официального манифеста версий
-> Mojang и список версий в UI. Установка и запуск игры — следующий этап.
+> Статус: ранний, но рабочий фундамент. Уже есть инстансы (создание/удаление,
+> изоляция), поиск и установка модов из Modrinth, манифест версий Mojang.
+> Авторизация, скины и запуск игры — следующие этапы.
 
 ## Стек
 
 - **Ядро:** Rust (`crates/core`), без зависимости от UI.
 - **Оболочка:** Tauri 2.
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS 4.
-- **Состояние:** TanStack Query + Zustand.
-- **Данные:** `version_manifest_v2.json` с piston-meta.mojang.com.
+- **Данные:** TanStack Query.
+- **Источники:** piston-meta.mojang.com, api.modrinth.com.
 
 Подробности и принятые решения — в [STACK.md](./STACK.md).
 
@@ -39,7 +41,8 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
-Только UI в обычном браузере (без Rust и Tauri — манифест грузится напрямую):
+Только UI в обычном браузере (без Rust и Tauri). В этом режиме инстансы хранятся
+в `localStorage`, а установка модов недоступна:
 
 ```bash
 pnpm dev
@@ -72,22 +75,26 @@ SELinux его можно убрать. Для пакетов замените `
 ```
 rclaunch/
 ├─ src/                      # React UI
-│  ├─ components/            # Sidebar, VersionList, VersionDetails, StatusBar
-│  ├─ hooks/                 # useVersions, useAppInfo
+│  ├─ screens/               # Instances, Mods, Account, Skins, Settings
+│  ├─ components/            # Rail, IconButton, CreateInstanceDialog
+│  ├─ hooks/                 # instances, versions, Modrinth
 │  ├─ lib/                   # IPC-обёртки, форматирование
 │  ├─ bindings.ts            # типы контракта UI ↔ Rust
 │  ├─ App.tsx
-│  └─ styles.css             # тема Tailwind (цвета бренда)
-├─ src-tauri/                # тонкий слой Tauri: команды и события
-│  ├─ src/commands.rs        # app_info, versions_manifest
+│  └─ styles.css             # чёрно-белая тема
+├─ src-tauri/                # тонкий слой Tauri: команды и состояние
+│  ├─ src/commands.rs        # версии, инстансы, Modrinth
 │  ├─ src/lib.rs             # builder, плагины, состояние
 │  ├─ capabilities/          # минимальные разрешения
 │  └─ tauri.conf.json
-├─ crates/core/              # ядро: Mojang API, пути, установка, запуск
+├─ crates/core/              # ядро
 │  └─ src/
 │     ├─ mojang/             # манифест версий
+│     ├─ instances.rs        # инстансы, instances.json
+│     ├─ modrinth.rs         # поиск и установка модов
 │     ├─ paths.rs            # каталоги по ОС
 │     └─ error.rs
+├─ contrib/Containerfile     # сборка в контейнере
 ├─ public/logo.png
 ├─ STACK.md
 └─ Cargo.toml                # workspace
@@ -96,20 +103,21 @@ rclaunch/
 ## Что уже есть
 
 - [x] Каркас workspace: `crates/core` + `src-tauri` + React.
-- [x] Загрузка `version_manifest_v2.json` и парсинг в типизированные структуры.
-- [x] Tauri-команда `versions_manifest`, IPC-обёртка и типы на фронте.
-- [x] UI: список версий, фильтры, поиск, карточка версии, статус-бар.
-- [x] Тёмная чёрно-синяя тема и иконки из логотипа.
-- [x] MIT-лицензия.
+- [x] Минималистичный UI: рейка, инстансы, моды, аккаунт, скины, настройки.
+- [x] Инстансы: создание с версией и лоадером, изоляция, удаление.
+- [x] `instances.json` с атомарной записью и безопасными id.
+- [x] Загрузка манифеста Mojang и выбор версии.
+- [x] Modrinth: поиск под версию/лоадер и установка в `mods/` с SHA-512.
+- [x] Иконки и тема из логотипа, MIT-лицензия, CI.
 
 ## Дальше
 
-1. Скачивание version JSON, client jar, libraries и ассетов с hash-проверкой.
-2. Подбор и установка JRE (Mojang manifest + Adoptium fallback).
-3. Microsoft-авторизация (`minecraft-msa-auth` + `oauth2`) и offline-режим.
-4. Fabric/Quilt-профили.
-5. Сборка аргументов, запуск Java и консоль логов.
-6. Несколько инстансов, настройки RAM, i18n.
+1. Microsoft-авторизация (`minecraft-msa-auth` + `oauth2`) и мульти-аккаунт.
+2. Скины и плащи с 2D-превью.
+3. Скачивание version JSON, client jar, libraries и ассетов с hash-проверкой.
+4. JRE: Mojang manifest + Adoptium fallback.
+5. Fabric/Quilt-профили и запуск игры с консолью логов.
+6. Зависимости модов, ресурспаки и шейдеры Modrinth.
 
 ## Лицензия
 

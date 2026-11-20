@@ -1,4 +1,4 @@
-import type { VersionType } from "../bindings";
+import type { Loader, VersionType } from "../bindings";
 
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   day: "numeric",
@@ -11,16 +11,53 @@ export function formatDate(iso: string): string {
   return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
 }
 
+export function formatRelative(timestamp: number | null): string {
+  if (!timestamp) {
+    return "—";
+  }
+
+  const diff = Date.now() - timestamp;
+  const day = 86_400_000;
+
+  if (diff < day) {
+    return "сегодня";
+  }
+  if (diff < 2 * day) {
+    return "вчера";
+  }
+  if (diff < 30 * day) {
+    return `${Math.floor(diff / day)} дн.`;
+  }
+  if (diff < 365 * day) {
+    return `${Math.floor(diff / (30 * day))} мес.`;
+  }
+  return `${Math.floor(diff / (365 * day))} г.`;
+}
+
+export function formatDownloads(downloads: number): string {
+  if (downloads >= 1_000_000_000) {
+    return `${(downloads / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (downloads >= 1_000_000) {
+    return `${(downloads / 1_000_000).toFixed(1)}M`;
+  }
+  if (downloads >= 1_000) {
+    return `${Math.round(downloads / 1_000)}K`;
+  }
+  return String(downloads);
+}
+
 export const versionTypeLabel: Record<VersionType, string> = {
-  release: "Релиз",
-  snapshot: "Снапшот",
-  old_beta: "Beta",
-  old_alpha: "Alpha",
+  release: "release",
+  snapshot: "snapshot",
+  old_beta: "beta",
+  old_alpha: "alpha",
 };
 
-export const versionTypeBadge: Record<VersionType, string> = {
-  release: "bg-emerald-500/10 text-emerald-300",
-  snapshot: "bg-amber-500/10 text-amber-300",
-  old_beta: "bg-white/5 text-slate-400",
-  old_alpha: "bg-white/5 text-slate-400",
+export const loaderLabel: Record<Loader, string> = {
+  vanilla: "Vanilla",
+  fabric: "Fabric",
+  quilt: "Quilt",
+  forge: "Forge",
+  neoforge: "NeoForge",
 };

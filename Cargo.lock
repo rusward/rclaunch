@@ -3053,12 +3053,15 @@ name = "rclaunch-core"
 version = "0.1.0"
 dependencies = [
  "directories",
+ "hex",
  "log",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror 2.0.21",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

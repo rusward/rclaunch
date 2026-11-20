@@ -25,7 +25,13 @@ impl Paths {
 
     /// Создаёт все каталоги, если их ещё нет.
     pub fn ensure(&self) -> Result<()> {
-        for dir in [&self.config, &self.data, &self.cache, &self.game_dir()] {
+        for dir in [
+            &self.config,
+            &self.data,
+            &self.cache,
+            &self.game_dir(),
+            &self.instances_dir(),
+        ] {
             std::fs::create_dir_all(dir)?;
         }
         Ok(())
@@ -66,5 +72,27 @@ impl Paths {
 
     pub fn logs_dir(&self) -> PathBuf {
         self.data.join("logs")
+    }
+
+    /// Корень пользовательских инстансов.
+    pub fn instances_dir(&self) -> PathBuf {
+        self.data.join("instances")
+    }
+
+    pub fn instance_dir(&self, id: &str) -> PathBuf {
+        self.instances_dir().join(id)
+    }
+
+    /// Изолированный игровой каталог инстанса (раскладка `.minecraft`).
+    pub fn instance_game_dir(&self, id: &str) -> PathBuf {
+        self.instance_dir(id).join("game")
+    }
+
+    pub fn instance_mods_dir(&self, id: &str) -> PathBuf {
+        self.instance_game_dir(id).join("mods")
+    }
+
+    pub fn instances_file(&self) -> PathBuf {
+        self.config.join("instances.json")
     }
 }

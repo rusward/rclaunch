@@ -1,9 +1,10 @@
 # rclaunch — стек и архитектура
 
-Minecraft-лаунчер: кроссплатформенный (Windows / Linux / macOS), лёгкий, с поддержкой
-официальных аккаунтов Microsoft, офлайн-режима и модлоадеров Fabric/Quilt.
+Minecraft-лаунчер: кроссплатформенный (Windows / Linux / macOS), лёгкий, только с
+официальными аккаунтами Microsoft. Пользовательские изолированные инстансы,
+мульти-аккаунт, скины/плащи и моды из Modrinth.
 
-Статус документа: черновик решений (v0.1). По мере разработки решения фиксируются
+Статус документа: черновик решений (v0.2). По мере разработки решения фиксируются
 в разделе «Журнал решений».
 
 ---
@@ -16,9 +17,12 @@ Minecraft-лаунчер: кроссплатформенный (Windows / Linux 
 | UI | Tauri 2 + React + TypeScript + Vite | Малый бандл (~10 МБ), нативное окно, веб-UI |
 | Ядро | Rust (edition 2021/2024) | Скорость, безопасность памяти, хорошая экосистема HTTP/архивов |
 | Мост UI↔ядро | Tauri IPC (commands + events) | Типизированные команды, события прогресса |
-| Авторизация | Microsoft OAuth2 (device code) + offline | Официальный вход и тестовые/локальные серверы |
-| Модлоадеры (MVP) | Vanilla + Fabric + Quilt | Популярные, простой мета-API; Forge/NeoForge позже |
-| Объём MVP | Версии, Java, аккаунт, запуск игры | Минимальный рабочий лаунчер |
+| Авторизация | Только Microsoft OAuth2 (device code), мульти-аккаунт | Легальные аккаунты; офлайн-режима нет |
+| Модлоадеры | Vanilla + Fabric + Quilt + Forge + NeoForge | Как в PrismLauncher; установка поэтапно |
+| Инстансы | Изолированный каталог на сборку (версия + лоадер) | Независимые моды, миры и настройки |
+| Моды | Поиск и установка с Modrinth | Прямо в лаунчере, без браузера |
+| Скины | Смена скина и плаща через Minecraft Services + превью | Профиль аккаунта в лаунчере |
+| Объём MVP | Инстансы, Java, аккаунт, запуск, Modrinth | Минимальный рабочий лаунчер |
 | Хранилище настроек | JSON-файлы в конфиг-каталоге ОС | Просто, прозрачно, легко мигрировать |
 | Секреты (токены) | OS keychain (`keyring`) | Не держим refresh-токены в открытом JSON |
 
@@ -45,16 +49,19 @@ Minecraft-лаунчер: кроссплатформенный (Windows / Linux 
 │  ├─ downloader — параллельные загрузки, hash-проверка         │
 │  ├─ assets     — индексы ассетов, libraries, natives          │
 │  ├─ java       — подбор/скачивание JRE                        │
-│  ├─ auth       — Microsoft OAuth2 / offline UUID              │
-│  ├─ loaders    — Fabric / Quilt профили                       │
+│  ├─ auth       — Microsoft OAuth2, мульти-аккаунт            │
+│  ├─ loaders    — Fabric / Quilt / Forge / NeoForge            │
 │  ├─ launch     — сборка classpath/аргументов, spawn процесса  │
-│  ├─ instances  — игровые каталоги, настройки                   │
+│  ├─ instances  — изолированные сборки, instances.json         │
+│  ├─ modrinth   — поиск, установка модов, hash-проверка         │
+│  ├─ skins      — скины, плащи, превью профиля                  │
 │  └─ storage    — конфиг, кэш, логи                            │
 └───────────────▲──────────────────────────────────────────────┘
                 │ HTTPS
 ┌───────────────┴──────────────────────────────────────────────┐
 │  Внешние сервисы                                             │
-│  Mojang piston-meta / resources, Microsoft, Xbox, FabricMeta  │
+│  Mojang piston-meta / resources, Microsoft, Xbox,            │
+│  Minecraft Services, Fabric/Quilt/Forge Meta, Modrinth       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -70,12 +77,14 @@ Minecraft-лаунчер: кроссплатформенный (Windows / Linux 
 - **React 19 + TypeScript** — компонентный UI, строгая типизация IPC-контрактов.
 - **Vite** — быстрый dev-сервер и сборка.
 - **Tailwind CSS 4** — стили без раздувания CSS.
-- **Zustand** — локальное состояние UI (выбранная версия, экраны, модалки).
-- **TanStack Query** — асинхронные данные (список версий, профиль, статусы).
-- **React Router** — навигация между экранами.
-- **i18next / react-i18next** — i18n (ru/en с самого начала).
+- **TanStack Query** — асинхронные данные (версии, инстансы, Modrinth).
 - **lucide-react** — иконки.
 - **@tauri-apps/api** — `invoke`, `listen`, работа с окном.
+- **Zustand** — только если локального состояния станет много; сейчас хватает
+  `useState` и TanStack Query.
+- **React Router не используем:** экраны переключаются состоянием, без URL и
+  истории браузера.
+- **i18n** — позже, после стабилизации экранов.
 
 TypeScript-типы событий и команд генерируются/поддерживаются вручную в
 `src/bindings/` (единый контракт с Rust; позже можно подключить `ts-rs` или `specta`).
@@ -202,23 +211,51 @@ Adoptium/Temurin.
 7. Профиль: `GET https://api.minecraftservices.com/minecraft/profile` (uuid, name, skins).
 8. Обновление сессии — по `refresh_token`.
 
-Хранение: `refresh_token` только в OS keychain; `access_token` — в памяти.
+Хранение: `accounts.json` (uuid, имя, скины, плащи, активный аккаунт) в конфиге;
+`refresh_token` — в OS keychain под ключом `account:<uuid>`; `access_token` — в памяти.
 Отдельно обрабатываем типовые ошибки XSTS (нет Xbox-профиля, детский аккаунт и т.п.).
 
-### 4.5 Offline-режим
+### 4.5 Мульти-аккаунт
 
-- Ввод ника, без токенов.
-- UUID: `UUIDv3(md5, "OfflinePlayer:" + username)` — совместимо с ванильным сервером.
-- `accessToken` — фиктивное значение; `userType = legacy`/`offline`.
+- Список аккаунтов в `accounts.json`; секреты — по одному ключу keychain на uuid.
+- Активный аккаунт переключается без перезапуска; запуск игры берёт его сессию.
+- При старте — тихое обновление токенов; обновление одного аккаунта не блокирует другие.
+- Удаление аккаунта чистит и запись в keychain.
+- Офлайн-режима нет: только официальные Microsoft-аккаунты.
 
-### 4.6 Fabric / Quilt
+### 4.6 Модлоадеры
 
 - Fabric meta: `https://meta.fabricmc.net/v2/versions/loader/{game}`
   и готовый профиль `.../v2/versions/loader/{game}/{loader}/profile/json`.
 - Quilt meta: аналогичный API `https://meta.quiltmc.org/v3/...`.
-- Профиль лоадера — это version JSON с `inheritsFrom`; объединяем с базовой версией
-  (libraries, arguments, mainClass).
-- Скачиваем лоадер-библиотеки в общий `libraries/`.
+- Forge / NeoForge: установка через официальный installer или install profile;
+  результат — version JSON с `inheritsFrom` (нужна Java).
+- Профиль лоадера объединяем с базовой версией (libraries, arguments, mainClass).
+- Общие read-only кэши (`libraries/`, `assets/`, `runtimes/`) не дублируем;
+  изолируем `game/` инстанса: mods, config, saves, options.txt, logs.
+
+### 4.7 Скины и плащи
+
+- Профиль: `GET https://api.minecraftservices.com/minecraft/profile` —
+  `skins[]`, `capes[]`, активные элементы.
+- Смена скина: `POST .../minecraft/profile/skins` (multipart: `variant=classic|slim`,
+  PNG 64×64 или URL).
+- Плащ: `PUT .../minecraft/profile/capes/active` с `{ "capeId": "..." }`,
+  снятие — `DELETE`.
+- Превью — 2D-canvas из текстуры 64×64 (спереди/сзади) + изображение плаща;
+  без 3D-библиотек, чтобы не утяжелять UI.
+- Валидация PNG, размера и MIME до отправки.
+
+### 4.8 Modrinth
+
+- Поиск: `GET https://api.modrinth.com/v2/search`
+  с facets `project_type:mod`, `versions:<mc>`, `categories:<loader>`.
+- Версии проекта: `GET /v2/project/{id}/version?game_versions=[...]&loaders=[...]`.
+- Файл: primary из ответа, SHA-512-проверка, запись в
+  `instances/<id>/game/mods/<filename>`.
+- Обязательные зависимости — устанавливаем рекурсивно (с защитой от циклов).
+- `User-Agent: rclaunch/<version> (...)`; лимит запросов Modrinth — 300/мин.
+- Модпаки — позже; сейчас моды, ресурспаки и шейдеры можно добавить тем же API.
 
 ---
 
@@ -229,33 +266,36 @@ rclaunch/
 ├─ STACK.md
 ├─ README.md
 ├─ src/                     # frontend (React)
-│  ├─ app/                  # роутинг, провайдеры
-│  ├─ pages/                # Login, Versions, Settings, Console
-│  ├─ components/           # UI-компоненты
-│  ├─ bindings/             # типы IPC (команды/события)
-│  ├─ stores/               # Zustand
-│  └─ lib/                  # invoke-обёртки, i18n
+│  ├─ screens/              # Instances, Mods, Account, Skins, Settings
+│  ├─ components/           # Rail, IconButton, CreateInstanceDialog
+│  ├─ hooks/                # instances, versions, Modrinth
+│  ├─ lib/                  # IPC-обёртки, форматирование
+│  ├─ bindings.ts           # типы контракта UI ↔ Rust
+│  └─ styles.css            # тема: чёрный фон, белый текст
 ├─ src-tauri/
 │  ├─ Cargo.toml            # workspace
 │  ├─ tauri.conf.json
 │  ├─ capabilities/
-│  └─ src/                  # тонкий слой Tauri: команды, события
+│  └─ src/                  # тонкий слой Tauri: команды, состояние
 ├─ crates/
 │  └─ core/
 │     ├─ Cargo.toml
 │     └─ src/
 │        ├─ lib.rs
 │        ├─ mojang/         # манифест, version JSON, rules
+│        ├─ instances.rs    # инстансы, instances.json, изоляция
+│        ├─ modrinth.rs      # поиск и установка модов
+│        ├─ auth/           # Microsoft (device code), мульти-аккаунт
 │        ├─ downloader/     # очередь, ретраи, hash, прогресс
 │        ├─ assets/         # индексы, libraries, natives
 │        ├─ java/           # выбор и установка JRE
-│        ├─ auth/           # microsoft (device code), offline
-│        ├─ loaders/        # fabric, quilt
+│        ├─ loaders/        # fabric, quilt, forge, neoforge
 │        ├─ launch/         # аргументы, classpath, процесс
-│        ├─ instances/      # каталоги, настройки инстансов
-│        └─ storage/        # paths, config, cache, logs
-├─ docs/                    # ADR, заметки по API
-└─ .github/workflows/       # CI: сборка под 3 ОС
+│        ├─ skins/          # скины, плащи, превью
+│        ├─ paths.rs        # каталоги по ОС
+│        └─ error.rs
+├─ contrib/Containerfile     # воспроизводимая сборка
+└─ .github/workflows/       # CI: fmt, clippy, тесты, tauri build
 ```
 
 ### Каталоги данных пользователя
@@ -263,26 +303,45 @@ rclaunch/
 | Что | Windows | Linux | macOS |
 |---|---|---|---|
 | Конфиг | `%APPDATA%\rclaunch` | `~/.config/rclaunch` | `~/Library/Application Support/rclaunch` |
-| Данные/игра | `%APPDATA%\rclaunch\game` | `~/.local/share/rclaunch` | `~/Library/Application Support/rclaunch` |
+| Данные | `%APPDATA%\rclaunch` | `~/.local/share/rclaunch` | `~/Library/Application Support/rclaunch` |
 | Кэш | `%LOCALAPPDATA%\rclaunch\cache` | `~/.cache/rclaunch` | `~/Library/Caches/rclaunch` |
 
-Внутри игрового каталога — стандартная раскладка `.minecraft`:
-`versions/`, `libraries/`, `assets/`, `mods/`, `saves/`, `logs/`.
+Раскладка данных:
+
+```
+<data>/
+├─ instances/
+│  └─ <slug>-<id>/
+│     ├─ game/            # изолировано: mods, config, saves, options.txt, logs
+│     └─ version/         # version JSON + лоадер-профиль
+├─ libraries/             # общий read-only кэш
+├─ assets/                # общий read-only кэш
+└─ runtimes/              # JRE
+```
+
+`instances.json` и `accounts.json` — в конфиг-каталоге; токены — в keychain.
 
 ---
 
 ## 6. Ключевые сценарии
 
-### 6.1 Установка и запуск версии
+### 6.1 Создание инстанса
 
-1. Загрузить манифест версий, выбрать версию.
-2. Скачать version JSON, client jar, libraries (с учётом rules/OS).
-3. Скачать asset index и объекты ассетов.
-4. Подобрать/установить JRE нужной мажорной версии.
-5. Для Fabric/Quilt — подтянуть профиль лоадера и его библиотеки.
-6. Собрать classpath и аргументы JVM/игры.
-7. Запустить `java` как дочерний процесс, стримить stdout/stderr в UI-консоль.
-8. Отслеживать exit code; при необходимости показать диагностику (OOM, неверная Java).
+1. Пользователь задаёт имя, версию и модлоадер (vanilla/fabric/quilt/forge/neoforge).
+2. Ядро создаёт `instances/<slug>-<id>/` с изолированным `game/`.
+3. Для лоадера резолвится версия и сохраняется профиль.
+4. Инстанс появляется в списке; версия/лоадер можно менять только явно.
+
+### 6.2 Установка и запуск инстанса
+
+1. Проверить version JSON, client jar, libraries и ассеты (с учётом rules/OS).
+2. Дозагрузить недостающее; хэши проверяются по манифесту.
+3. Подобрать/установить JRE нужной мажорной версии.
+4. Для модлоадера — подтянуть его библиотеки и объединить профиль с базовой версией.
+5. Собрать classpath и аргументы JVM/игры для **game-dir инстанса**.
+6. Запустить `java` как дочерний процесс, стримить stdout/stderr в консоль.
+7. Отслеживать exit code; при необходимости показать диагностику (OOM, неверная Java).
+8. Обновить `lastPlayedAt` инстанса.
 
 Команда запуска (упрощённо):
 
@@ -292,20 +351,38 @@ java -Xmx<ram>M -Xms<ram>M \
   -cp <classpath> \
   <mainClass> \
   --username <name> --uuid <uuid> --accessToken <token> \
-  --version <id> --gameDir <dir> --assetsDir <assets> \
-  --assetIndex <index> --userType <msa|legacy> --versionType <release>
+  --version <id> --gameDir <instance>/game --assetsDir <assets> \
+  --assetIndex <index> --userType msa --versionType <release>
 ```
 
 Прогресс передаётся событиями: `download:progress`, `install:stage`, `game:log`,
 `game:exited`.
 
-### 6.2 Авторизация
+### 6.3 Авторизация и мульти-аккаунт
 
 1. UI вызывает `auth::start_device_code`.
 2. Ядро возвращает `user_code` + `verification_uri`; UI показывает их.
 3. Ядро опрашивает токен-эндпоинт; по готовности проходит цепочку Xbox → MC.
-4. `refresh_token` → keychain, профиль → UI.
-5. При старте лаунчера — тихое обновление сессии, если токен ещё валиден.
+4. `refresh_token` → keychain (`account:<uuid>`), профиль → `accounts.json`.
+5. При старте — тихое обновление всех аккаунтов; активный выбирается в UI.
+6. Переключение аккаунта меняет сессию для следующего запуска без рестарта.
+
+### 6.4 Скины и плащи
+
+1. Профиль отдаёт список скинов/плащей и активные элементы.
+2. UI рисует превью из текстуры 64×64 в canvas.
+3. Загрузка PNG → проверка 64×64 и MIME → `POST /minecraft/profile/skins`.
+4. Выбор плаща → `PUT /minecraft/profile/capes/active`.
+5. После успеха обновляем профиль и превью.
+
+### 6.5 Установка модов из Modrinth
+
+1. Берём версию и лоадер выбранного инстанса как facets.
+2. Поиск → выбор мода → список совместимых версий.
+3. Скачиваем primary-файл, проверяем SHA-512.
+4. Кладём в `instances/<id>/game/mods/`.
+5. Обязательные зависимости — рекурсивно, с защитой от циклов.
+6. Показываем статус: установлено / ошибка / уже есть.
 
 ---
 
@@ -334,24 +411,24 @@ java -Xmx<ram>M -Xms<ram>M \
 
 ---
 
-## 9. Объём MVP (v0.1)
+## 9. Объём MVP (v0.2)
 
 Входит:
-- Список версий с сервера Mojang (release/snapshot фильтры).
-- Установка vanilla-версии: client, libraries, assets, JRE.
-- Microsoft-вход (device code) и offline-аккаунт, хранение сессии.
-- Выбор версии, RAM (Xmx/Xms), папки игры.
+- Изолированные инстансы: создание, список, удаление, выбор версии и лоадера.
+- Microsoft-вход (device code), мульти-аккаунт, хранение сессии в keychain.
+- Vanilla + Fabric + Quilt: установка и запуск.
+- Modrinth: поиск модов под инстанс и установка в `mods/`.
+- Скины и плащи: превью 2D и смена через Minecraft Services.
+- Минималистичный чёрно-белый UI с синим акцентом.
 - Запуск игры с консолью логов и обработкой выхода.
-- Fabric/Quilt: установка лоадера для выбранной версии.
-- Русский и английский интерфейс.
 
 Не входит в MVP (roadmap):
-- Forge/NeoForge.
-- Менеджер модов и модпаков, установка из Modrinth/CurseForge.
-- Скины и плащи, редактор скинов.
-- Несколько инстансов с отдельными настройками.
+- Forge/NeoForge install (модель и UI уже поддерживают).
+- Модпаки, ресурспаки и шейдеры из Modrinth.
+- 3D-превью скина.
 - Автообновление лаунчера.
 - Серверный браузер/пинг серверов.
+- Светлая тема.
 
 ---
 
@@ -374,7 +451,15 @@ java -Xmx<ram>M -Xms<ram>M \
 - **ADR-002** — ядро вынесено в отдельный крейт `core`, Tauri — тонкий адаптер.
 - **ADR-003** — Microsoft device code flow вместо локального redirect-сервера:
   проще и безопаснее, работает на всех ОС.
-- **ADR-004** — Fabric/Quilt в MVP, Forge/NeoForge отложены.
+- **ADR-004** — в первую очередь Vanilla + Fabric + Quilt; Forge/NeoForge уже есть
+  в модели инстансов и UI, установка — следующий этап.
+- **ADR-008** — только легальные Microsoft-аккаунты; офлайн-режим не поддерживаем.
+- **ADR-009** — каждый инстанс изолирован: свой `game/`, version JSON и лоадер;
+  libraries/assets/runtimes — общий read-only кэш.
+- **ADR-010** — моды ставим напрямую из Modrinth (поиск → версия → SHA-512 → mods/),
+  без встроенного браузера.
+- **ADR-011** — UI строго минималистичный: чёрный фон, белый текст, иконки,
+  синий акцент из логотипа; без блюра, градиентных пятен и «веб-карточек».
 - **ADR-005** — JRE из манифеста Mojang с fallback на Adoptium.
 - **ADR-006** — install/launch пишем сами, auth через `minecraft-msa-auth` + `oauth2`:
   готовых крейтов нужной зрелости нет, а установка/запуск — ядро UX лаунчера.
@@ -388,11 +473,12 @@ java -Xmx<ram>M -Xms<ram>M \
 1. Какой `client_id` использовать для `minecraft-msa-auth`: публичный launcher-клиент
    (например, `00000000402b5328`) или собственное приложение Azure/Entra? — влияет на
    лимиты, брендинг и согласие пользователя.
-2. Поддержка нескольких инстансов: сразу закладываем структуру каталогов или позже?
-3. Автообновление лаунчера: `tauri-plugin-updater` + свой сервер обновлений?
-4. Нужна ли поддержка старых версий (alpha/beta, pre-1.7 виртуальные ассеты) в v0.1?
-5. Локализация: только ru/en или сразу закладываем формат для сообщества?
-6. Политика телеметрии/логов: что и куда отправляем (по умолчанию — ничего).
+2. Когда добавлять установку Forge/NeoForge: сразу после запуска vanilla или позже?
+3. Modrinth: только моды в первой версии или сразу ресурспаки и шейдеры?
+4. Превью скина: остаёмся на 2D-canvas или добавляем 3D?
+5. Нужна ли поддержка старых версий (alpha/beta, pre-1.7 виртуальные ассеты)?
+6. Локализация: только ru/en или сразу закладываем формат для сообщества?
+7. Политика телеметрии/логов: что и куда отправляем (по умолчанию — ничего).
 
 ---
 
@@ -401,33 +487,36 @@ java -Xmx<ram>M -Xms<ram>M \
 Исходный логотип: `logo.png` в корне. Производные ассеты:
 
 - `public/logo.png` — логотип для интерфейса (512 px, прозрачный фон);
-- `src-tauri/icons/` — иконки приложения (png, `.ico`, `.icns`) на тёмном
-  скруглённом фоне.
+- `src-tauri/icons/` — иконки приложения (RGBA PNG, `.ico`, `.icns`).
 
-Палитра снята с логотипа:
+Палитра:
 
 | Токен | HEX | Назначение |
 |---|---|---|
-| `brand-500` | `#209BFC` | яркий акцент, иконки, hover |
-| `brand-600` | `#0957E9` | основной синий, кнопки, активные элементы |
-| `brand-700` | `#0941CA` | глубокий синий, градиенты |
-| `brand-800` | `#032CA5` | тени, фоновые пятна |
-| `brand-900` | `#051A7C` | самый тёмный синий |
-| `ink-950` | `#05070D` | фон приложения |
-| `ink-900/850/800` | `#080C16` / `#0B1120` / `#0F172A` | поверхности и карточки |
-| `ink-700/600` | `#16213A` / `#1E2C49` | границы, скроллбар |
-| текст | `#DBE3F0` | основной текст |
-| `#A4BEFB` | светло-голубой | мягкие подписи, свечение |
+| `accent-500` | `#209BFC` | активные иконки, hover |
+| `accent-600` | `#0957E9` | основной синий, кнопки |
+| `accent-700` | `#0941CA` | нажатое состояние |
+| фон | `#000000` | фон приложения |
+| `panel` | `#070707` | панели, шапки |
+| `panel-raised` | `#0C0C0C` | модальные окна |
+| `line` | `#1A1A1A` | разделители и рамки |
+| `muted` | `#8A8A8A` | вторичный текст |
+| `faint` | `#5C5C5C` | подписи, метаданные |
+| текст | `#FFFFFF` | основной текст |
 
 Принципы:
 
-- Тёмная тема по умолчанию, без светлой в MVP.
-- Никаких внешних CDN и веб-шрифтов: только локальные ассеты и системный
-  font stack (Inter → system-ui).
-- Синий — акцент, а не заливка: фон остаётся почти чёрным, сияние — через
-  размытые радиальные градиенты.
-- Сетка экрана «Играть»: сайдбар 240 px → список версий 368 px → карточка
-  версии → статус-бар.
+- Чёрный фон, белый текст, синий — только акцент. Никаких градиентных пятен,
+  blur, тяжёлых теней и «карточек» с рамками на каждом блоке.
+- Интерфейс иконочный: боковая рейка 56 px, подписи только там, где без них
+  непонятно; tooltip и `aria-label` обязательны.
+- Без «браузерности»: нет URL, истории, нативных скроллбаров на виду, больших
+  заголовков и текстовых простыней.
+- Плотная типографика: 11–13 px, заголовки экранов 13 px.
+- Анимации только 100–120 ms на цвет/прозрачность; никаких анимаций layout.
+- Только локальные ассеты и системный font stack. Без WebGL и 3D-библиотек.
+- Бюджет: JS < 350 КБ (gzip < 100 КБ), CSS < 20 КБ; список модов — lazy images.
+- Сетка: рейка 56 px → контент; список инстансов 248 px; остальное — детали.
 
 ---
 
