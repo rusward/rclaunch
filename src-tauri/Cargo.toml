@@ -1,0 +1,21 @@
+[package]
+name = "rclaunch"
+description = "A lightweight cross-platform Minecraft launcher"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "rclaunch_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+log.workspace = true
+rclaunch-core = { path = "../crates/core" }
+serde.workspace = true
+tauri = { version = "2", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-single-instance = "2"
