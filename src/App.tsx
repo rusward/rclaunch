@@ -59,7 +59,7 @@ export default function App() {
       )}
 
       {screen === "account" && <AccountScreen />}
-      {screen === "skins" && <SkinsScreen />}
+      {screen === "skins" && <SkinsScreen onNavigate={setScreen} />}
       {screen === "settings" && <SettingsScreen />}
     </div>
   );

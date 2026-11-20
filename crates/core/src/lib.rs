@@ -3,6 +3,7 @@
 //! Крейт не знает про Tauri: его можно использовать из CLI, тестов или
 //! другого фронтенда. Tauri-слой в `src-tauri` — тонкий адаптер над `Core`.
 
+pub mod auth;
 pub mod error;
 pub mod instances;
 pub mod modrinth;
@@ -11,6 +12,7 @@ pub mod paths;
 
 use std::path::Path;
 
+pub use auth::{Account, AccountProfile, AccountsView, AuthService, Cape, Session, Skin};
 pub use error::{CoreError, Result};
 pub use instances::{CreateInstance, Instance, InstanceService, Loader};
 pub use modrinth::{InstalledMod, ModSearchResult, ModrinthClient};

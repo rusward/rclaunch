@@ -4,9 +4,9 @@
 Microsoft, изолированные инстансы как в PrismLauncher, мульти-аккаунт, скины и
 плащи, моды из Modrinth. Минималистичный чёрно-белый интерфейс с синим акцентом.
 
-> Статус: ранний, но рабочий фундамент. Уже есть инстансы (создание/удаление,
-> изоляция), поиск и установка модов из Modrinth, манифест версий Mojang.
-> Авторизация, скины и запуск игры — следующие этапы.
+> Статус: рабочий фундамент. Уже есть инстансы (создание/удаление, изоляция),
+> вход Microsoft и мульти-аккаунт, превью скина/плаща, поиск и установка модов
+> из Modrinth, манифест версий Mojang. Запуск игры — следующий этап.
 
 ## Стек
 
@@ -23,8 +23,8 @@ Microsoft, изолированные инстансы как в PrismLauncher, 
 - Rust stable (ставится через [rustup](https://rustup.rs)).
 - Node.js 20+ и [pnpm](https://pnpm.io).
 - Системные зависимости Tauri 2:
-  - **Fedora:** `sudo dnf install webkit2gtk4.1-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel openssl-devel` и `sudo dnf group install "c-development"`.
-  - **Debian/Ubuntu:** `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`.
+  - **Fedora:** `sudo dnf install webkit2gtk4.1-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel openssl-devel dbus-devel` и `sudo dnf group install "c-development"`.
+  - **Debian/Ubuntu:** `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev`.
   - **Windows:** Visual Studio Build Tools (C++) + WebView2 (обычно уже есть).
   - **macOS:** Xcode Command Line Tools.
 
@@ -92,6 +92,7 @@ rclaunch/
 │     ├─ mojang/             # манифест версий
 │     ├─ instances.rs        # инстансы, instances.json
 │     ├─ modrinth.rs         # поиск и установка модов
+│     ├─ auth.rs             # Microsoft, Xbox, Minecraft, аккаунты
 │     ├─ paths.rs            # каталоги по ОС
 │     └─ error.rs
 ├─ contrib/Containerfile     # сборка в контейнере
@@ -106,14 +107,17 @@ rclaunch/
 - [x] Минималистичный UI: рейка, инстансы, моды, аккаунт, скины, настройки.
 - [x] Инстансы: создание с версией и лоадером, изоляция, удаление.
 - [x] `instances.json` с атомарной записью и безопасными id.
+- [x] Вход Microsoft (публичный client_id, live.com) и мульти-аккаунт.
+- [x] Refresh-токены в OS keychain, `accounts.json` с активным аккаунтом.
+- [x] Превью скина (2D-canvas) и плаща из профиля.
 - [x] Загрузка манифеста Mojang и выбор версии.
 - [x] Modrinth: поиск под версию/лоадер и установка в `mods/` с SHA-512.
 - [x] Иконки и тема из логотипа, MIT-лицензия, CI.
 
 ## Дальше
 
-1. Microsoft-авторизация (`minecraft-msa-auth` + `oauth2`) и мульти-аккаунт.
-2. Скины и плащи с 2D-превью.
+1. Свой Azure client_id → device code flow (публичный останется fallback).
+2. Загрузка скина и выбор плаща через Minecraft Services.
 3. Скачивание version JSON, client jar, libraries и ассетов с hash-проверкой.
 4. JRE: Mojang manifest + Adoptium fallback.
 5. Fabric/Quilt-профили и запуск игры с консолью логов.

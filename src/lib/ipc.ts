@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type {
+  Account,
+  AccountsView,
   AppInfo,
   CreateInstanceRequest,
   Instance,
@@ -194,4 +196,22 @@ export const ipc = {
       : Promise.reject(
           new Error("Установка модов доступна только в приложении"),
         ),
+
+  authAccounts: (): Promise<AccountsView> =>
+    isTauri()
+      ? invoke<AccountsView>("auth_accounts")
+      : Promise.resolve({ accounts: [], activeId: null }),
+
+  authLogin: (): Promise<Account> =>
+    isTauri()
+      ? invoke<Account>("auth_login")
+      : Promise.reject(new Error("Вход доступен только в приложении")),
+
+  authSetActive: (id: string): Promise<void> =>
+    isTauri()
+      ? invoke<void>("auth_set_active", { id })
+      : Promise.resolve(),
+
+  authLogout: (id: string): Promise<void> =>
+    isTauri() ? invoke<void>("auth_logout", { id }) : Promise.resolve(),
 };

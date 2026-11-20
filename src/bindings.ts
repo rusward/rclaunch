@@ -62,3 +62,31 @@ export interface InstalledMod {
   filename: string;
   version: string;
 }
+
+export interface Skin {
+  id: string;
+  state: string;
+  url: string;
+  variant: string;
+  alias?: string | null;
+}
+
+export interface Cape {
+  id: string;
+  state: string;
+  url: string;
+  alias?: string | null;
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  skins: Skin[];
+  capes: Cape[];
+  addedAt: number;
+}
+
+export interface AccountsView {
+  accounts: Account[];
+  activeId: string | null;
+}

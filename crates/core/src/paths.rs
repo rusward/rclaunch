@@ -95,4 +95,8 @@ impl Paths {
     pub fn instances_file(&self) -> PathBuf {
         self.config.join("instances.json")
     }
+
+    pub fn accounts_file(&self) -> PathBuf {
+        self.config.join("accounts.json")
+    }
 }

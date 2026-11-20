@@ -17,7 +17,7 @@ Minecraft-лаунчер: кроссплатформенный (Windows / Linux 
 | UI | Tauri 2 + React + TypeScript + Vite | Малый бандл (~10 МБ), нативное окно, веб-UI |
 | Ядро | Rust (edition 2021/2024) | Скорость, безопасность памяти, хорошая экосистема HTTP/архивов |
 | Мост UI↔ядро | Tauri IPC (commands + events) | Типизированные команды, события прогресса |
-| Авторизация | Только Microsoft OAuth2 (device code), мульти-аккаунт | Легальные аккаунты; офлайн-режима нет |
+| Авторизация | Microsoft OAuth (live.com auth code сейчас; device code после своего Azure) | Легальные аккаунты; офлайн-режима нет |
 | Модлоадеры | Vanilla + Fabric + Quilt + Forge + NeoForge | Как в PrismLauncher; установка поэтапно |
 | Инстансы | Изолированный каталог на сборку (версия + лоадер) | Независимые моды, миры и настройки |
 | Моды | Поиск и установка с Modrinth | Прямо в лаунчере, без браузера |
@@ -198,22 +198,26 @@ Adoptium/Temurin.
 
 ### 4.4 Авторизация Microsoft
 
-Поток device code (без встроенного браузера и без redirect-сервера):
+Сейчас используется публичный client_id (`00000000402b5328`) и authorization code
+flow `login.live.com` — он работает без своего Azure-приложения:
 
-1. `POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode`
-   (client_id приложения Azure, scope `XboxLive.signin offline_access`).
-2. Показываем пользователю код и ссылку `microsoft.com/link`.
-3. Опрос `POST .../oauth2/v2.0/token` с `grant_type=urn:ietf:params:oauth:grant-type:device_code`
-   до получения `access_token` + `refresh_token`.
-4. Xbox Live: `POST https://user.auth.xboxlive.com/user/authenticate`.
-5. XSTS: `POST https://xsts.auth.xboxlive.com/xsts/authorize`.
-6. Minecraft: `POST https://api.minecraftservices.com/authentication/login_with_xbox`.
-7. Профиль: `GET https://api.minecraftservices.com/minecraft/profile` (uuid, name, skins).
-8. Обновление сессии — по `refresh_token`.
+1. Открываем встроенное окно Tauri на `https://login.live.com/oauth20_authorize.srf`
+   (`client_id`, `response_type=code`, `scope=...MBI_SSL`, `state`).
+2. Перехватываем redirect на `https://login.live.com/oauth20_desktop.srf`,
+   проверяем `state`, забираем `code`.
+3. Меняем `code` на MSA-токен (`oauth20_token.srf`); `refresh_token` → keychain.
+4. Xbox Live → XSTS → Minecraft Services → профиль (`skins`, `capes`).
+5. Повторный вход — по `refresh_token`; аккаунт и профиль — в `accounts.json`.
 
-Хранение: `accounts.json` (uuid, имя, скины, плащи, активный аккаунт) в конфиге;
-`refresh_token` — в OS keychain под ключом `account:<uuid>`; `access_token` — в памяти.
-Отдельно обрабатываем типовые ошибки XSTS (нет Xbox-профиля, детский аккаунт и т.п.).
+Целевой режим после регистрации своего Azure-приложения:
+
+- device code flow через `login.microsoftonline.com/consumers/oauth2/v2.0/devicecode`
+  (без встроенного окна, надёжнее и удобнее);
+- `client_id` читается из `RCLAUNCH_CLIENT_ID` или конфига, чтобы не менять код;
+- публичный client_id остаётся fallback'ом для dev-сборок.
+
+Ограничение: публичный client_id принадлежит Xbox-приложению, а не нам; для
+публичного релиза нужен свой Azure app и одобрение Mojang.
 
 ### 4.5 Мульти-аккаунт
 
@@ -460,6 +464,9 @@ java -Xmx<ram>M -Xms<ram>M \
   без встроенного браузера.
 - **ADR-011** — UI строго минималистичный: чёрный фон, белый текст, иконки,
   синий акцент из логотипа; без блюра, градиентных пятен и «веб-карточек».
+- **ADR-012** — пока нет своего Azure-приложения, используем публичный client_id
+  и live.com authorization code; после регистрации и одобрения Mojang переходим
+  на device code без изменения остального кода.
 - **ADR-005** — JRE из манифеста Mojang с fallback на Adoptium.
 - **ADR-006** — install/launch пишем сами, auth через `minecraft-msa-auth` + `oauth2`:
   готовых крейтов нужной зрелости нет, а установка/запуск — ядро UX лаунчера.
@@ -470,9 +477,8 @@ java -Xmx<ram>M -Xms<ram>M \
 
 ## 12. Открытые вопросы
 
-1. Какой `client_id` использовать для `minecraft-msa-auth`: публичный launcher-клиент
-   (например, `00000000402b5328`) или собственное приложение Azure/Entra? — влияет на
-   лимиты, брендинг и согласие пользователя.
+1. Свой Azure `client_id` нужен для публичного релиза и device code; сейчас
+   работает публичный client_id. Когда регистрируем — меняем конфиг, не код.
 2. Когда добавлять установку Forge/NeoForge: сразу после запуска vanilla или позже?
 3. Modrinth: только моды в первой версии или сразу ресурспаки и шейдеры?
 4. Превью скина: остаёмся на 2D-canvas или добавляем 3D?

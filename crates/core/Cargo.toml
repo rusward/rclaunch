@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 directories = "6"
+keyring.workspace = true
 log.workspace = true
 reqwest.workspace = true
 serde.workspace = true

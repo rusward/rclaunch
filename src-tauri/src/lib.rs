@@ -20,7 +20,12 @@ pub fn run() {
         .setup(|app| {
             let core = Core::new()?;
             let instances = rclaunch_core::InstanceService::load(core.paths())?;
-            app.manage(commands::AppState { core, instances });
+            let auth = rclaunch_core::AuthService::new(core.paths())?;
+            app.manage(commands::AppState {
+                core,
+                instances,
+                auth,
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -31,6 +36,10 @@ pub fn run() {
             commands::instances_delete,
             commands::modrinth_search,
             commands::modrinth_install,
+            commands::auth_accounts,
+            commands::auth_set_active,
+            commands::auth_logout,
+            commands::auth_login,
         ])
         .run(tauri::generate_context!())
         .expect("error while running rclaunch");
