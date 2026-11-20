@@ -111,7 +111,7 @@ pub struct AuthService {
 impl AuthService {
     pub fn new(paths: &Paths) -> Result<Self> {
         let file = paths.accounts_file();
-        let store = match fs::read(&file) {
+        let mut store = match fs::read(&file) {
             Ok(bytes) => serde_json::from_slice::<AccountsFile>(&bytes).unwrap_or_else(|error| {
                 log::warn!("accounts file is invalid, starting empty: {error}");
                 AccountsFile::default()
@@ -119,6 +119,15 @@ impl AuthService {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => AccountsFile::default(),
             Err(error) => return Err(error.into()),
         };
+
+        for account in &mut store.accounts {
+            for skin in &mut account.skins {
+                skin.url = secure_texture(&skin.url);
+            }
+            for cape in &mut account.capes {
+                cape.url = secure_texture(&cape.url);
+            }
+        }
 
         let client_id =
             std::env::var("RCLAUNCH_CLIENT_ID").unwrap_or_else(|_| DEFAULT_CLIENT_ID.to_string());
@@ -363,13 +372,25 @@ impl AuthService {
             .await?;
         let profile: ProfileResponse =
             parse_response(profile_response, "Minecraft profile").await?;
+        let ProfileResponse {
+            id,
+            name,
+            mut skins,
+            mut capes,
+        } = profile;
+        for skin in &mut skins {
+            skin.url = secure_texture(&skin.url);
+        }
+        for cape in &mut capes {
+            cape.url = secure_texture(&cape.url);
+        }
 
         Ok((
             AccountProfile {
-                id: profile.id,
-                name: profile.name,
-                skins: profile.skins,
-                capes: profile.capes,
+                id,
+                name,
+                skins,
+                capes,
             },
             mc.access_token,
             mc.expires_in,
@@ -552,6 +573,14 @@ fn default_variant() -> String {
     "CLASSIC".to_string()
 }
 
+/// Minecraft отдаёт текстуры по `http://`; в WebView нужен `https://`.
+fn secure_texture(url: &str) -> String {
+    match url.strip_prefix("http://textures.minecraft.net") {
+        Some(rest) => format!("https://textures.minecraft.net{rest}"),
+        None => url.to_string(),
+    }
+}
+
 fn xsts_message(xerr: Option<u64>, message: Option<String>) -> String {
     match xerr {
         Some(2148916233) => "У аккаунта нет профиля Xbox. Создайте его на xbox.com.".to_string(),
@@ -599,5 +628,17 @@ mod tests {
         let profile: AccountProfile = serde_json::from_str(json).unwrap();
         assert_eq!(profile.name, "Steve");
         assert_eq!(profile.skins[0].variant, "SLIM");
+    }
+
+    #[test]
+    fn upgrades_texture_urls() {
+        assert_eq!(
+            secure_texture("http://textures.minecraft.net/texture/abc"),
+            "https://textures.minecraft.net/texture/abc"
+        );
+        assert_eq!(
+            secure_texture("https://textures.minecraft.net/texture/abc"),
+            "https://textures.minecraft.net/texture/abc"
+        );
     }
 }
