@@ -46,6 +46,27 @@ pnpm dev
 # http://localhost:1420
 ```
 
+### Сборка в контейнере
+
+Если не хочется ставить Rust и системные библиотеки в систему, есть готовый
+`contrib/Containerfile` (Ubuntu 24.04 + Rust + Node 22 + pnpm + webkit2gtk-4.1):
+
+```bash
+podman build -t rclaunch-build -f contrib/Containerfile .
+
+podman run --rm --security-opt label=disable \
+  -v "$PWD:/app" \
+  -v rclaunch-node-modules:/app/node_modules \
+  -w /app -e CI=true \
+  rclaunch-build bash -lc 'pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
+```
+
+Бинарник появится в `src-tauri/target/release/rclaunch`. Флаг
+`--security-opt label=disable` нужен для SELinux (Fedora); на системах без
+SELinux его можно убрать. Для пакетов замените `--no-bundle` на
+`--bundles deb,rpm` (AppImage требует FUSE).
+
+
 ## Структура
 
 ```
