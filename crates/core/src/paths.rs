@@ -14,8 +14,8 @@ pub struct Paths {
 
 impl Paths {
     pub fn discover() -> Result<Self> {
-        let dirs = ProjectDirs::from("dev", "rclaunch", "rclaunch")
-            .ok_or(CoreError::NoProjectDirs)?;
+        let dirs =
+            ProjectDirs::from("dev", "rclaunch", "rclaunch").ok_or(CoreError::NoProjectDirs)?;
         Ok(Self {
             config: dirs.config_dir().to_path_buf(),
             data: dirs.data_dir().to_path_buf(),

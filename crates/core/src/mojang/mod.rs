@@ -43,7 +43,10 @@ impl MojangClient {
             .error_for_status()?
             .json::<VersionManifest>()
             .await?;
-        log::info!("version manifest loaded: {} versions", manifest.versions.len());
+        log::info!(
+            "version manifest loaded: {} versions",
+            manifest.versions.len()
+        );
         Ok(manifest)
     }
 }
