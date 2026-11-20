@@ -181,12 +181,12 @@ pub async fn auth_login(app: AppHandle, state: State<'_, AppState>) -> Result<Ac
         }
     });
 
-    let redirect = tokio::time::timeout(Duration::from_secs(300), rx)
-        .await
+    let result = tokio::time::timeout(Duration::from_secs(300), rx).await;
+    let _ = window.close();
+
+    let redirect = result
         .map_err(|_| "время входа истекло".to_string())?
         .map_err(|_| "окно входа закрыто".to_string())?;
-
-    let _ = window.close();
 
     if redirect == "__closed__" {
         return Err("вход отменён".to_string());
