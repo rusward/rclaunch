@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rclaunch_core::{
-    Account, AccountsView, AuthService, Core, CreateInstance, DownloadProgress, InstalledMod,
-    Instance, InstanceService, LaunchReporter, ModSearchResult, VersionManifest,
+    Account, AccountsView, AuthService, Core, CreateInstance, DownloadProgress, InstalledProject,
+    Instance, InstanceService, LaunchReporter, ProjectSearchResult, ProjectType, VersionManifest,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
@@ -67,17 +67,23 @@ pub fn instances_delete(state: State<'_, AppState>, id: String) -> Result<(), St
     })
 }
 
-/// Поиск модов на Modrinth под версию и модлоадер инстанса.
+/// Поиск проектов Modrinth под версию и модлоадер инстанса.
 #[tauri::command]
 pub async fn modrinth_search(
     state: State<'_, AppState>,
     query: String,
     game_version: Option<String>,
     loader: Option<String>,
-) -> Result<Vec<ModSearchResult>, String> {
+    project_type: ProjectType,
+) -> Result<Vec<ProjectSearchResult>, String> {
     state
         .core
-        .search_mods(&query, game_version.as_deref(), loader.as_deref())
+        .search_projects(
+            &query,
+            game_version.as_deref(),
+            loader.as_deref(),
+            project_type,
+        )
         .await
         .map_err(|error| {
             log::error!("modrinth search failed: {error}");
@@ -85,28 +91,45 @@ pub async fn modrinth_search(
         })
 }
 
-/// Устанавливает мод в `mods/` выбранного инстанса.
+/// Устанавливает мод, ресурспак или шейдерпак в каталог выбранного инстанса.
 #[tauri::command]
 pub async fn modrinth_install(
     state: State<'_, AppState>,
     instance_id: String,
     project_id: String,
-) -> Result<InstalledMod, String> {
+    project_type: ProjectType,
+) -> Result<InstalledProject, String> {
     let instance = state
         .instances
         .get(&instance_id)
         .ok_or_else(|| "instance not found".to_string())?;
 
-    let loader = instance
-        .loader
-        .modrinth_category()
-        .ok_or_else(|| "vanilla instance does not support mods".to_string())?;
+    let loader = if project_type.uses_loader() {
+        Some(
+            instance
+                .loader
+                .modrinth_category()
+                .ok_or_else(|| "vanilla instance does not support mods".to_string())?,
+        )
+    } else {
+        None
+    };
 
-    let mods_dir = state.core.paths().instance_mods_dir(&instance.id);
+    let target_dir = match project_type {
+        ProjectType::Mod => state.core.paths().instance_mods_dir(&instance.id),
+        ProjectType::ResourcePack => state.core.paths().instance_resourcepacks_dir(&instance.id),
+        ProjectType::Shader => state.core.paths().instance_shaderpacks_dir(&instance.id),
+    };
 
     state
         .core
-        .install_mod(&project_id, &instance.minecraft_version, loader, &mods_dir)
+        .install_project(
+            project_type,
+            &project_id,
+            &instance.minecraft_version,
+            loader,
+            &target_dir,
+        )
         .await
         .map_err(|error| {
             log::error!("modrinth install failed: {error}");

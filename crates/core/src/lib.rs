@@ -21,7 +21,7 @@ pub use auth::{Account, AccountProfile, AccountsView, AuthService, Cape, Session
 pub use download::DownloadProgress;
 pub use error::{CoreError, Result};
 pub use instances::{CreateInstance, Instance, InstanceService, Loader};
-pub use modrinth::{InstalledMod, ModSearchResult, ModrinthClient};
+pub use modrinth::{InstalledProject, ModrinthClient, ProjectSearchResult, ProjectType};
 pub use mojang::{LatestVersions, MojangClient, VersionEntry, VersionManifest, VersionType};
 pub use paths::Paths;
 pub use prepare::{LaunchReporter, PreparedLaunch};
@@ -65,26 +65,28 @@ impl Core {
         self.mojang.fetch_manifest().await
     }
 
-    pub async fn search_mods(
+    pub async fn search_projects(
         &self,
         query: &str,
         game_version: Option<&str>,
         loader: Option<&str>,
-    ) -> Result<Vec<ModSearchResult>> {
+        project_type: ProjectType,
+    ) -> Result<Vec<ProjectSearchResult>> {
         self.modrinth
-            .search(query, game_version, loader, None)
+            .search(query, game_version, loader, project_type, None)
             .await
     }
 
-    pub async fn install_mod(
+    pub async fn install_project(
         &self,
+        project_type: ProjectType,
         project_id: &str,
         game_version: &str,
-        loader: &str,
-        mods_dir: &Path,
-    ) -> Result<InstalledMod> {
+        loader: Option<&str>,
+        target_dir: &Path,
+    ) -> Result<InstalledProject> {
         self.modrinth
-            .install(project_id, game_version, loader, mods_dir)
+            .install(project_type, project_id, game_version, loader, target_dir)
             .await
     }
 }

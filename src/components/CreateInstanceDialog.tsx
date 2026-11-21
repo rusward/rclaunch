@@ -61,7 +61,8 @@ export function CreateInstanceDialog({
       .slice(0, 150);
   }, [data, snapshots, versionQuery]);
 
-  const canCreate = name.trim().length > 0 && version.length > 0 && !create.isPending;
+  const canCreate =
+    name.trim().length > 0 && version.length > 0 && !create.isPending;
 
   const submit = () => {
     if (!canCreate) {
@@ -87,20 +88,27 @@ export function CreateInstanceDialog({
 
   return (
     <div
-      className="animate-fade fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+      className="animate-fade fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="animate-pop flex max-h-[82vh] w-[420px] flex-col overflow-hidden rounded-xl border border-line bg-panel-raised">
-        <header className="flex h-11 shrink-0 items-center justify-between border-b border-line px-4">
-          <h2 className="text-[13px] font-medium text-white">Новый инстанс</h2>
+      <div className="glass-modal animate-pop flex max-h-[84vh] w-[440px] flex-col overflow-hidden rounded-2xl">
+        <header className="flex shrink-0 items-center justify-between px-5 pb-1 pt-4">
+          <div>
+            <h2 className="text-[14px] font-semibold tracking-tight text-white">
+              Новый инстанс
+            </h2>
+            <p className="mt-0.5 text-[10.5px] text-faint">
+              Изолированная папка, версия и модлоадер
+            </p>
+          </div>
           <IconButton icon={X} label="Закрыть" size="sm" onClick={onClose} />
         </header>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <Field label="Название">
             <input
               autoFocus
@@ -120,9 +128,7 @@ export function CreateInstanceDialog({
 
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wide text-faint">
-                Версия
-              </span>
+              <span className="section-label">Версия</span>
               <button
                 type="button"
                 onClick={() => setSnapshots((value) => !value)}
@@ -137,21 +143,18 @@ export function CreateInstanceDialog({
               </button>
             </div>
 
-            <div className="relative mt-1.5">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-faint"
-              />
+            <div className="glass-field mt-1.5 flex h-9 items-center rounded-[10px] pl-2">
+              <Search size={12} className="shrink-0 text-faint" />
               <input
                 value={versionQuery}
                 onChange={(event) => setVersionQuery(event.target.value)}
                 placeholder="Поиск версии"
                 spellCheck={false}
-                className="input pl-7"
+                className="h-full w-full bg-transparent pl-1.5 pr-2 text-[12px] text-white outline-none placeholder:text-faint"
               />
             </div>
 
-            <div className="mt-1.5 max-h-36 overflow-y-auto rounded-md border border-line bg-black p-1">
+            <div className="mt-1.5 max-h-36 overflow-y-auto rounded-xl border border-white/[0.07] bg-black/25 p-1">
               {isLoading && (
                 <div className="flex items-center gap-1.5 px-2 py-2 text-[11px] text-faint">
                   <Loader2 size={12} className="animate-spin" />
@@ -171,10 +174,10 @@ export function CreateInstanceDialog({
                     type="button"
                     onClick={() => setVersion(entry.id)}
                     className={clsx(
-                      "flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-[12px] transition-colors duration-100",
+                      "flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[12px] transition-colors duration-100",
                       version === entry.id
-                        ? "bg-white/[0.07] text-white"
-                        : "text-muted hover:bg-white/[0.04] hover:text-white",
+                        ? "bg-white/[0.1] text-white"
+                        : "text-muted hover:bg-white/[0.05] hover:text-white",
                     )}
                   >
                     <span className="truncate">{entry.id}</span>
@@ -190,9 +193,7 @@ export function CreateInstanceDialog({
           </div>
 
           <div>
-            <span className="text-[10px] uppercase tracking-wide text-faint">
-              Модлоадер
-            </span>
+            <span className="section-label">Модлоадер</span>
             <div className="mt-1.5 grid grid-cols-5 gap-1">
               {loaders.map((item) => (
                 <button
@@ -200,10 +201,10 @@ export function CreateInstanceDialog({
                   type="button"
                   onClick={() => setLoader(item)}
                   className={clsx(
-                    "h-7 truncate rounded-md text-[10px] transition-colors duration-100",
+                    "h-8 truncate rounded-lg text-[10.5px] transition-colors duration-100",
                     loader === item
-                      ? "bg-white/[0.08] text-white"
-                      : "text-muted hover:bg-white/[0.04] hover:text-white",
+                      ? "bg-white/[0.13] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                      : "text-muted hover:bg-white/[0.05] hover:text-white",
                   )}
                 >
                   {loaderLabel[item]}
@@ -225,27 +226,30 @@ export function CreateInstanceDialog({
           )}
 
           {errorMessage && (
-            <p className="break-words text-[11px] text-red-400">{errorMessage}</p>
+            <p className="break-words text-[11px] text-red-400">
+              {errorMessage}
+            </p>
           )}
         </div>
 
-        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-4 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-8 rounded-md px-3 text-[12px] text-muted transition-colors duration-100 hover:bg-white/[0.05] hover:text-white"
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            disabled={!canCreate}
-            onClick={submit}
-            className="flex h-8 items-center gap-1.5 rounded-md bg-accent-600 px-3 text-[12px] font-medium text-white transition-colors duration-100 hover:bg-accent-500 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {create.isPending && <Loader2 size={13} className="animate-spin" />}
-            Создать
-          </button>
+        <footer className="shrink-0 px-5 pb-4 pt-1">
+          <div className="hairline mb-3" />
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" onClick={onClose} className="btn-ghost">
+              Отмена
+            </button>
+            <button
+              type="button"
+              disabled={!canCreate}
+              onClick={submit}
+              className="btn-primary"
+            >
+              {create.isPending && (
+                <Loader2 size={13} className="animate-spin" />
+              )}
+              Создать
+            </button>
+          </div>
         </footer>
       </div>
     </div>
@@ -261,9 +265,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] uppercase tracking-wide text-faint">
-        {label}
-      </span>
+      <span className="section-label">{label}</span>
       <div className="mt-1.5">{children}</div>
     </label>
   );

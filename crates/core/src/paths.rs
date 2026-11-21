@@ -92,6 +92,14 @@ impl Paths {
         self.instance_game_dir(id).join("mods")
     }
 
+    pub fn instance_resourcepacks_dir(&self, id: &str) -> PathBuf {
+        self.instance_game_dir(id).join("resourcepacks")
+    }
+
+    pub fn instance_shaderpacks_dir(&self, id: &str) -> PathBuf {
+        self.instance_game_dir(id).join("shaderpacks")
+    }
+
     /// Собранные natives для инстанса.
     pub fn instance_natives_dir(&self, id: &str) -> PathBuf {
         self.instance_dir(id).join("natives")

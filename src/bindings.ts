@@ -46,7 +46,9 @@ export interface CreateInstanceRequest {
   memoryMb?: number;
 }
 
-export interface ModSearchResult {
+export type ProjectType = "mod" | "resourcepack" | "shader";
+
+export interface ProjectSearchResult {
   id: string;
   slug: string;
   title: string;
@@ -57,7 +59,7 @@ export interface ModSearchResult {
   categories: string[];
 }
 
-export interface InstalledMod {
+export interface InstalledProject {
   projectId: string;
   filename: string;
   version: string;

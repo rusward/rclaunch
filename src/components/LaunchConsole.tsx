@@ -38,12 +38,12 @@ export function LaunchConsole({
   }[state.status];
 
   return (
-    <div className="animate-pop fixed bottom-3 right-3 z-50 flex w-[420px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-lg border border-line bg-panel-raised">
-      <header className="flex h-9 items-center gap-2 border-b border-line px-3">
+    <div className="glass-modal animate-pop fixed bottom-4 right-4 z-50 flex w-[430px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl">
+      <header className="flex h-10 items-center gap-2 px-3.5">
         {isRunning && (
           <Loader2 size={12} className="animate-spin text-accent-400" />
         )}
-        <span className="truncate text-[12px] text-white">
+        <span className="truncate text-[12px] font-medium text-white">
           {state.instanceName ?? "Запуск"}
         </span>
         <span className="text-[10px] text-faint">{statusText}</span>
@@ -55,27 +55,29 @@ export function LaunchConsole({
       </header>
 
       {(state.status === "preparing" || state.status === "running") && (
-        <div className="px-3 py-2">
+        <div className="px-3.5 pb-2.5">
           <div className="flex items-center justify-between text-[10px] text-faint">
-            <span>{state.stage || "подготовка"}</span>
+            <span className="truncate">{state.stage || "подготовка"}</span>
             {state.progress && (
-              <span>
+              <span className="shrink-0 pl-2">
                 {state.progress.completed}/{state.progress.total}
               </span>
             )}
           </div>
-          <div className="mt-1.5 h-1 overflow-hidden rounded bg-white/[0.06]">
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.08]">
             <div
-              className="h-full bg-accent-500 transition-[width] duration-150"
+              className="h-full rounded-full bg-gradient-to-r from-accent-500 to-accent-400 transition-[width] duration-150"
               style={{ width: `${percent}%` }}
             />
           </div>
         </div>
       )}
 
+      <div className="hairline" />
+
       <div
         ref={logRef}
-        className="max-h-44 min-h-16 overflow-y-auto border-t border-line px-3 py-2 font-mono text-[10px] leading-relaxed text-muted"
+        className="max-h-44 min-h-16 overflow-y-auto px-3.5 py-2 font-mono text-[10px] leading-relaxed text-muted"
       >
         {state.logs.length === 0 ? (
           <span className="text-faint">Ожидание Java…</span>
@@ -89,13 +91,13 @@ export function LaunchConsole({
       </div>
 
       {state.status === "error" && state.error && (
-        <div className="border-t border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] text-red-400">
+        <div className="border-t border-red-500/20 bg-red-500/5 px-3.5 py-2 text-[11px] text-red-400">
           {state.error}
         </div>
       )}
 
       {state.status === "exited" && (
-        <div className="border-t border-line px-3 py-2 text-[11px] text-muted">
+        <div className="border-t border-white/[0.06] px-3.5 py-2 text-[11px] text-muted">
           Игра завершена
           {state.exitCode !== null ? ` · код ${state.exitCode}` : ""}
         </div>

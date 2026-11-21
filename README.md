@@ -2,12 +2,14 @@
 
 Лёгкий кроссплатформенный лаунчер Minecraft: только официальные аккаунты
 Microsoft, изолированные инстансы как в PrismLauncher, мульти-аккаунт, скины и
-плащи, моды из Modrinth. Минималистичный чёрно-белый интерфейс с синим акцентом.
+плащи, моды, ресурспаки и шейдерпаки из Modrinth. Тёмный glassmorphism-интерфейс:
+полупрозрачные панели, мягкие градиенты и синий акцент из логотипа.
 
 > Статус: лаунчер уже запускает игру. Есть инстансы (создание/удаление, изоляция),
-> вход Microsoft и мульти-аккаунт, превью скина/плаща, Modrinth, а также полный
-> пайплайн запуска Vanilla/Fabric/Quilt: version JSON, libraries, assets, JRE,
-> classpath, процесс Java и консоль логов. Forge/NeoForge — следующий этап.
+> вход Microsoft и мульти-аккаунт, объединённый профиль со скином/плащом, поиск и
+> установка модов, ресурспаков и шейдерпаков, а также полный пайплайн запуска
+> Vanilla/Fabric/Quilt: version JSON, libraries, assets, JRE, classpath, процесс
+> Java и консоль логов. Forge/NeoForge — следующий этап.
 
 ## Стек
 
@@ -80,13 +82,13 @@ SELinux его можно убрать. Для пакетов замените `
 ```
 rclaunch/
 ├─ src/                      # React UI
-│  ├─ screens/               # Instances, Mods, Account, Skins, Settings
-│  ├─ components/            # Rail, IconButton, CreateInstanceDialog, LaunchConsole
+│  ├─ screens/               # Instances, Mods, Profile, Settings
+│  ├─ components/            # Sidebar, PageHeader, IconButton, dialogs, console
 │  ├─ hooks/                 # instances, versions, Modrinth, auth, launch
 │  ├─ lib/                   # IPC-обёртки, форматирование
 │  ├─ bindings.ts            # типы контракта UI ↔ Rust
 │  ├─ App.tsx
-│  └─ styles.css             # чёрно-белая тема
+│  └─ styles.css             # glassmorphism-тема и токены
 ├─ src-tauri/                # тонкий слой Tauri: команды и состояние
 │  ├─ src/commands.rs        # версии, инстансы, Modrinth, auth, launch
 │  ├─ src/lib.rs             # builder, плагины, состояние
@@ -96,7 +98,7 @@ rclaunch/
 │  └─ src/
 │     ├─ mojang/             # манифест версий
 │     ├─ instances.rs        # инстансы, instances.json
-│     ├─ modrinth.rs         # поиск и установка модов
+│     ├─ modrinth.rs         # моды, ресурспаки, шейдерпаки из Modrinth
 │     ├─ auth.rs             # Microsoft, Xbox, Minecraft, аккаунты
 │     ├─ version.rs          # version JSON, rules, Maven, merge
 │     ├─ download.rs         # параллельные загрузки + SHA-1
@@ -114,14 +116,14 @@ rclaunch/
 ## Что уже есть
 
 - [x] Каркас workspace: `crates/core` + `src-tauri` + React.
-- [x] Минималистичный UI: рейка, инстансы, моды, аккаунт, скины, настройки.
+- [x] Glassmorphism-UI: плавающая стеклянная оболочка, сайдбар, сегментированные вкладки.
 - [x] Инстансы: создание с версией и лоадером, изоляция, удаление.
 - [x] `instances.json` с атомарной записью и безопасными id.
 - [x] Вход Microsoft (публичный client_id, live.com) и мульти-аккаунт.
 - [x] Refresh-токены в OS keychain, `accounts.json` с активным аккаунтом.
-- [x] Превью скина (2D-canvas) и плаща из профиля.
+- [x] Объединённый профиль: аккаунты, превью скина (2D-canvas) и плаща.
 - [x] Загрузка манифеста Mojang и выбор версии.
-- [x] Modrinth: поиск под версию/лоадер и установка в `mods/` с SHA-512.
+- [x] Modrinth: моды, ресурспаки и шейдерпаки под версию/лоадер, установка с SHA-512.
 - [x] Запуск Vanilla/Fabric/Quilt: version JSON, client jar, libraries, assets,
       natives, classpath, аргументы и процесс Java.
 - [x] Maven-резолвер для Fabric/Quilt-библиотек и дедупликация версий.
@@ -134,8 +136,9 @@ rclaunch/
 1. Forge/NeoForge: installer/install profile и запуск.
 2. Загрузка скина и выбор плаща через Minecraft Services.
 3. Свой Azure client_id → device code flow (публичный останется fallback).
-4. Зависимости модов, ресурспаки и шейдеры Modrinth.
-5. Настройки RAM/разрешения, i18n, несколько окон логов.
+4. Зависимости модов, обновление и удаление установленного контента.
+5. Настройки RAM/разрешения/JVM-аргументов, i18n, несколько окон логов.
+6. Кастомный заголовок окна без нативной рамки (как в референсе).
 
 ## Лицензия
 

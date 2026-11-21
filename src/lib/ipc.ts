@@ -6,9 +6,10 @@ import type {
   AppInfo,
   CreateInstanceRequest,
   Instance,
-  InstalledMod,
+  InstalledProject,
   Loader,
-  ModSearchResult,
+  ProjectSearchResult,
+  ProjectType,
   VersionManifest,
 } from "../bindings";
 
@@ -95,18 +96,21 @@ function loaderCategory(loader: Loader): string | null {
   return loader === "vanilla" ? null : loader;
 }
 
-async function searchModsInBrowser(
+async function searchProjectsInBrowser(
   query: string,
   gameVersion: string | null,
   loader: Loader | null,
-): Promise<ModSearchResult[]> {
-  const facets: string[][] = [["project_type:mod"]];
+  projectType: ProjectType,
+): Promise<ProjectSearchResult[]> {
+  const facets: string[][] = [[`project_type:${projectType}`]];
   if (gameVersion) {
     facets.push([`versions:${gameVersion}`]);
   }
-  const category = loader ? loaderCategory(loader) : null;
-  if (category) {
-    facets.push([`categories:${category}`]);
+  if (projectType === "mod" && loader) {
+    const category = loaderCategory(loader);
+    if (category) {
+      facets.push([`categories:${category}`]);
+    }
   }
 
   const params = new URLSearchParams({
@@ -180,23 +184,30 @@ export const ipc = {
     query: string,
     gameVersion: string | null,
     loader: Loader | null,
-  ): Promise<ModSearchResult[]> =>
+    projectType: ProjectType,
+  ): Promise<ProjectSearchResult[]> =>
     isTauri()
-      ? invoke<ModSearchResult[]>("modrinth_search", {
+      ? invoke<ProjectSearchResult[]>("modrinth_search", {
           query,
           gameVersion,
-          loader: loader ? loaderCategory(loader) : null,
+          loader: projectType === "mod" && loader ? loaderCategory(loader) : null,
+          projectType,
         })
-      : searchModsInBrowser(query, gameVersion, loader),
+      : searchProjectsInBrowser(query, gameVersion, loader, projectType),
 
   modrinthInstall: (
     instanceId: string,
     projectId: string,
-  ): Promise<InstalledMod> =>
+    projectType: ProjectType,
+  ): Promise<InstalledProject> =>
     isTauri()
-      ? invoke<InstalledMod>("modrinth_install", { instanceId, projectId })
+      ? invoke<InstalledProject>("modrinth_install", {
+          instanceId,
+          projectId,
+          projectType,
+        })
       : Promise.reject(
-          new Error("Установка модов доступна только в приложении"),
+          new Error("Установка доступна только в приложении"),
         ),
 
   authAccounts: (): Promise<AccountsView> =>

@@ -23,10 +23,12 @@ export function IconButton({
       title={label}
       aria-label={label}
       className={clsx(
-        "inline-flex shrink-0 items-center justify-center rounded-md transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-35",
+        "inline-flex shrink-0 items-center justify-center rounded-lg transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-35",
         size === "sm" ? "h-7 w-7" : "h-8 w-8",
-        variant === "ghost" && "text-muted hover:bg-white/[0.06] hover:text-white",
-        variant === "danger" && "text-muted hover:bg-red-500/10 hover:text-red-400",
+        variant === "ghost" &&
+          "text-muted hover:bg-white/[0.08] hover:text-white",
+        variant === "danger" &&
+          "text-muted hover:bg-red-500/10 hover:text-red-400",
         className,
       )}
       {...rest}
